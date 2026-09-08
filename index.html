@@ -6,7 +6,11 @@
   <title>孩要有你｜電子計次券</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
+  <script>
+  const SUPABASE_URL = 'https://kytdrgmwyupjzjdyjhjh.supabase.co/rest/v1/';
+  const SUPABASE_KEY = 'sb_publishable_ZEoEcNmr5dMoZtIEGdPCfA_ffav8l9O';
+  const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+</script>
   <style
     * {
       box-sizing: border-box;
