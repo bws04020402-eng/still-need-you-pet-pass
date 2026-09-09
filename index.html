@@ -2428,118 +2428,291 @@ async function createPass() {
       )[0]
   );
 }
-async function editSelectedPass() {
+/* ========================
+   修改計次券
+======================== */
+
+function editSelectedPass() {
   if (!selectedPass) return;
 
-  const ask = (label, current) => {
-    const value = prompt(label, current ?? "");
-    return value === null ? current : value;
-  };
+  const old = document.getElementById("editPassModal");
+  if (old) old.remove();
 
-  const ownerName = ask("飼主姓名", selectedPass.owner_name);
-  const phone = ask("電話", selectedPass.phone);
-  const petName = ask("毛孩名字", selectedPass.pet_name);
-  const breed = ask("犬種", selectedPass.breed);
+  const pass = selectedPass;
 
-  const passAmount = Number(
-    ask("計次券金額", selectedPass.pass_amount || 0)
-  ) || 0;
+  const modal = document.createElement("div");
+  modal.id = "editPassModal";
 
-  const stylingAddon = ask(
-    "加購造型",
-    selectedPass.styling_addon || ""
-  );
+  modal.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:99999;
+    background:rgba(0,0,0,.55);
+    display:flex;
+    align-items:flex-end;
+    justify-content:center;
+    padding:0;
+  `;
 
-  const stylingAddonAmount = Number(
-    ask(
-      "加購造型金額",
-      selectedPass.styling_addon_amount || 0
-    )
-  ) || 0;
+  modal.innerHTML = `
+    <div style="
+      background:#fff;
+      width:100%;
+      max-width:620px;
+      max-height:92vh;
+      overflow-y:auto;
+      border-radius:22px 22px 0 0;
+      padding:22px;
+      box-sizing:border-box;
+      color:#111;
+    ">
+      <div style="
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        margin-bottom:18px;
+      ">
+        <h2 style="margin:0;">修改計次券</h2>
 
-  const passAddonAmount = Number(
-    ask(
-      "計次券加購",
-      selectedPass.pass_addon_amount || 0
-    )
-  ) || 0;
+        <button
+          type="button"
+          onclick="closeEditPassModal()"
+          style="
+            border:0;
+            background:#eee;
+            border-radius:12px;
+            padding:9px 14px;
+            font-size:16px;
+          "
+        >
+          取消
+        </button>
+      </div>
 
-  const spaAddonAmount = Number(
-    ask(
-      "SPA 加購",
-      selectedPass.spa_addon_amount || 0
-    )
-  ) || 0;
+      <label>飼主姓名</label>
+      <input id="editOwnerName" value="${esc(pass.owner_name || "")}">
 
-  const bathExtraAmount = Number(
-    ask(
-      "洗澡差額",
-      selectedPass.bath_extra_amount || 0
-    )
-  ) || 0;
+      <label>電話</label>
+      <input id="editPhone" value="${esc(pass.phone || "")}">
 
-  const groomExtraAmount = Number(
-    ask(
-      "大美差額",
-      selectedPass.groom_extra_amount || 0
-    )
-  ) || 0;
+      <label>毛孩名字</label>
+      <input id="editPetName" value="${esc(pass.pet_name || "")}">
 
-  const sharedPetName = ask(
-    "另一隻毛孩名字",
-    selectedPass.shared_pet_name || ""
-  );
+      <label>犬種</label>
+      <input id="editBreed" value="${esc(pass.breed || "")}">
 
-  const notes = ask(
-    "備註",
-    selectedPass.notes || ""
-  );
+      <label>計次券金額</label>
+      <input
+        id="editPassAmount"
+        type="number"
+        inputmode="numeric"
+        value="${Number(pass.pass_amount || 0)}"
+      >
 
-  const totalPaid =
-    passAmount +
-    stylingAddonAmount +
-    passAddonAmount +
-    spaAddonAmount;
+      <label>加購造型</label>
+      <input
+        id="editStylingAddon"
+        value="${esc(pass.styling_addon || "")}"
+      >
+
+      <label>加購造型金額</label>
+      <input
+        id="editStylingAddonAmount"
+        type="number"
+        inputmode="numeric"
+        value="${Number(pass.styling_addon_amount || 0)}"
+      >
+
+      <label>計次券加購</label>
+      <input
+        id="editPassAddonAmount"
+        type="number"
+        inputmode="numeric"
+        value="${Number(pass.pass_addon_amount || 0)}"
+      >
+
+      <label>SPA 加購</label>
+      <input
+        id="editSpaAddonAmount"
+        type="number"
+        inputmode="numeric"
+        value="${Number(pass.spa_addon_amount || 0)}"
+      >
+
+      <label>總金額</label>
+      <input
+        id="editTotalPaid"
+        type="number"
+        value="${Number(pass.total_paid || 0)}"
+        readonly
+        style="background:#f2f2f2;"
+      >
+
+      <label>洗澡差額</label>
+      <input
+        id="editBathExtraAmount"
+        type="number"
+        inputmode="numeric"
+        value="${Number(pass.bath_extra_amount || 0)}"
+      >
+
+      <label>大美差額</label>
+      <input
+        id="editGroomExtraAmount"
+        type="number"
+        inputmode="numeric"
+        value="${Number(pass.groom_extra_amount || 0)}"
+      >
+
+      <label>另一隻毛孩名字</label>
+      <input
+        id="editSharedPetName"
+        value="${esc(pass.shared_pet_name || "")}"
+      >
+
+      <label>備註</label>
+      <textarea
+        id="editPassNotes"
+        rows="3"
+      >${esc(pass.notes || "")}</textarea>
+
+      <button
+        type="button"
+        class="btn"
+        onclick="saveEditedPass()"
+        style="
+          width:100%;
+          margin-top:20px;
+          padding:15px;
+          font-size:17px;
+        "
+      >
+        儲存修改
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  [
+    "editPassAmount",
+    "editStylingAddonAmount",
+    "editPassAddonAmount",
+    "editSpaAddonAmount"
+  ].forEach(id => {
+    document
+      .getElementById(id)
+      .addEventListener("input", updateEditTotal);
+  });
+
+  updateEditTotal();
+}
+
+
+function closeEditPassModal() {
+  const modal = document.getElementById("editPassModal");
+  if (modal) modal.remove();
+}
+
+
+function updateEditTotal() {
+  const number = id =>
+    Number(document.getElementById(id)?.value || 0);
+
+  const total =
+    number("editPassAmount") +
+    number("editStylingAddonAmount") +
+    number("editPassAddonAmount") +
+    number("editSpaAddonAmount");
+
+  document.getElementById("editTotalPaid").value = total;
+}
+
+
+async function saveEditedPass() {
+  if (!selectedPass) return;
+
+  const value = id =>
+    document.getElementById(id)?.value ?? "";
+
+  const number = id =>
+    Number(value(id) || 0);
 
   const updates = {
-    owner_name: ownerName,
-    phone: phone,
-    pet_name: petName,
-    breed: breed,
-    pass_amount: passAmount,
-    styling_addon: stylingAddon,
-    styling_addon_amount: stylingAddonAmount,
-    pass_addon_amount: passAddonAmount,
-    spa_addon_amount: spaAddonAmount,
-    total_paid: totalPaid,
-    bath_extra_amount: bathExtraAmount,
-    groom_extra_amount: groomExtraAmount,
-    shared_pet_name: sharedPetName,
-    notes: notes
+    owner_name: value("editOwnerName").trim(),
+    phone: value("editPhone").trim(),
+    pet_name: value("editPetName").trim(),
+    breed: value("editBreed").trim(),
+
+    pass_amount: number("editPassAmount"),
+
+    styling_addon:
+      value("editStylingAddon").trim(),
+
+    styling_addon_amount:
+      number("editStylingAddonAmount"),
+
+    pass_addon_amount:
+      number("editPassAddonAmount"),
+
+    spa_addon_amount:
+      number("editSpaAddonAmount"),
+
+    total_paid:
+      number("editTotalPaid"),
+
+    bath_extra_amount:
+      number("editBathExtraAmount"),
+
+    groom_extra_amount:
+      number("editGroomExtraAmount"),
+
+    shared_pet_name:
+      value("editSharedPetName").trim(),
+
+    notes:
+      value("editPassNotes").trim()
   };
 
-  const { error } = await client
-    .from("passes")
-    .update(updates)
-    .eq("id", selectedPass.id);
+  const saveButton =
+    document.querySelector(
+      '#editPassModal button[onclick="saveEditedPass()"]'
+    );
 
-  if (error) {
-    alert("修改失敗：" + error.message);
-    return;
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "儲存中...";
   }
 
   const passId = selectedPass.id;
 
+  const { error } = await client
+    .from("passes")
+    .update(updates)
+    .eq("id", passId);
+
+  if (error) {
+    alert("修改失敗：" + error.message);
+
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "儲存修改";
+    }
+
+    return;
+  }
+
   await refreshData();
 
   selectedPass =
-    passes.find(pass => pass.id === passId) || selectedPass;
+    passes.find(pass => pass.id === passId) ||
+    selectedPass;
 
+  closeEditPassModal();
   renderSelectedPass();
 
   alert("修改成功");
 }
-
 /* =========================
    開啟簽名
 ========================= */
