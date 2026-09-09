@@ -3026,7 +3026,7 @@ function renderRecords() {
 
 ${
   transaction.signature
-    ? '<span class="signed">已簽名</span>　<a href="' + transaction.signature + '" target="_blank" rel="noopener">查看簽名</a>'
+    ? '<span class="signed">已簽名</span>　<details style="display:inline-block"><summary style="color:#06c;text-decoration:underline;cursor:pointer">查看簽名</summary><img src="' + transaction.signature + '" style="display:block;max-width:280px;width:100%;margin-top:10px;border:1px solid #ddd;border-radius:8px;background:white;padding:8px"></details>'
     : '<span class="unsigned">未簽名</span>'
 }
 
