@@ -2179,7 +2179,29 @@ function autoExpiry() {
     );
 }
 
+function autoTotalPaid() {
+  const total =
+    (Number(document.getElementById("passAmount").value) || 0) +
+    (Number(document.getElementById("stylingAddonAmount").value) || 0) +
+    (Number(document.getElementById("passAddonAmount").value) || 0) +
+    (Number(document.getElementById("spaAddonAmount").value) || 0);
 
+  document.getElementById("totalPaid").value =
+    total === 0 ? "" : total;
+}
+
+[
+  "passAmount",
+  "stylingAddonAmount",
+  "passAddonAmount",
+  "spaAddonAmount"
+].forEach(id => {
+  document
+    .getElementById(id)
+    .addEventListener("input", autoTotalPaid);
+});
+
+document.getElementById("totalPaid").readOnly = true;
 /* =========================
    建立計次券
 ========================= */
