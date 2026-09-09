@@ -2428,9 +2428,117 @@ async function createPass() {
       )[0]
   );
 }
-/* ========================
-   開啟簽名
-======================== */
+async function editSelectedPass() {
+  if (!selectedPass) return;
+
+  const ask = (label, current) => {
+    const value = prompt(label, current ?? "");
+    return value === null ? current : value;
+  };
+
+  const ownerName = ask("飼主姓名", selectedPass.owner_name);
+  const phone = ask("電話", selectedPass.phone);
+  const petName = ask("毛孩名字", selectedPass.pet_name);
+  const breed = ask("犬種", selectedPass.breed);
+
+  const passAmount = Number(
+    ask("計次券金額", selectedPass.pass_amount || 0)
+  ) || 0;
+
+  const stylingAddon = ask(
+    "加購造型",
+    selectedPass.styling_addon || ""
+  );
+
+  const stylingAddonAmount = Number(
+    ask(
+      "加購造型金額",
+      selectedPass.styling_addon_amount || 0
+    )
+  ) || 0;
+
+  const passAddonAmount = Number(
+    ask(
+      "計次券加購",
+      selectedPass.pass_addon_amount || 0
+    )
+  ) || 0;
+
+  const spaAddonAmount = Number(
+    ask(
+      "SPA 加購",
+      selectedPass.spa_addon_amount || 0
+    )
+  ) || 0;
+
+  const bathExtraAmount = Number(
+    ask(
+      "洗澡差額",
+      selectedPass.bath_extra_amount || 0
+    )
+  ) || 0;
+
+  const groomExtraAmount = Number(
+    ask(
+      "大美差額",
+      selectedPass.groom_extra_amount || 0
+    )
+  ) || 0;
+
+  const sharedPetName = ask(
+    "另一隻毛孩名字",
+    selectedPass.shared_pet_name || ""
+  );
+
+  const notes = ask(
+    "備註",
+    selectedPass.notes || ""
+  );
+
+  const totalPaid =
+    passAmount +
+    stylingAddonAmount +
+    passAddonAmount +
+    spaAddonAmount;
+
+  const updates = {
+    owner_name: ownerName,
+    phone: phone,
+    pet_name: petName,
+    breed: breed,
+    pass_amount: passAmount,
+    styling_addon: stylingAddon,
+    styling_addon_amount: stylingAddonAmount,
+    pass_addon_amount: passAddonAmount,
+    spa_addon_amount: spaAddonAmount,
+    total_paid: totalPaid,
+    bath_extra_amount: bathExtraAmount,
+    groom_extra_amount: groomExtraAmount,
+    shared_pet_name: sharedPetName,
+    notes: notes
+  };
+
+  const { error } = await client
+    .from("passes")
+    .update(updates)
+    .eq("id", selectedPass.id);
+
+  if (error) {
+    alert("修改失敗：" + error.message);
+    return;
+  }
+
+  const passId = selectedPass.id;
+
+  await refreshData();
+
+  selectedPass =
+    passes.find(pass => pass.id === passId) || selectedPass;
+
+  renderSelectedPass();
+
+  alert("修改成功");
+}
 
 /* =========================
    開啟簽名
