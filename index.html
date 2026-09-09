@@ -1,14 +1,10 @@
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="UTF-8" />
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0, viewport-fit=cover"
-  />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>孩要有你｜電子計次券</title>
 
-  <!-- Supabase 官方 CDN，只載入一次 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
@@ -16,11 +12,21 @@
       box-sizing: border-box;
     }
 
+    :root {
+      --bg: #f4f4f1;
+      --ink: #1f1f1f;
+      --muted: #777;
+      --line: #e6e6e2;
+      --ok: #18733b;
+      --warn: #8a6700;
+      --danger: #a62d2d;
+    }
+
     body {
       margin: 0;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #f5f5f3;
-      color: #222;
+      background: var(--bg);
+      color: var(--ink);
     }
 
     button,
@@ -39,47 +45,53 @@
     }
 
     .app {
-      max-width: 700px;
+      max-width: 760px;
       margin: auto;
       min-height: 100vh;
-      padding-bottom: 100px;
+      padding-bottom: 90px;
     }
 
     header {
-      background: #171717;
-      color: white;
-      padding: 22px 18px 18px;
       position: sticky;
       top: 0;
-      z-index: 10;
+      z-index: 20;
+      background: #171717;
+      color: white;
+      padding: 18px;
     }
 
     header h1 {
       margin: 0;
-      font-size: 22px;
+      font-size: 21px;
     }
 
     header p {
-      margin: 5px 0 0;
+      margin: 4px 0 0;
       color: #bbb;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .page {
-      padding: 18px;
+      padding: 14px;
     }
 
     .card {
       background: white;
-      border-radius: 20px;
-      padding: 18px;
-      margin-bottom: 14px;
-      box-shadow: 0 5px 18px rgba(0, 0, 0, .05);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 4px 14px rgba(0,0,0,.035);
     }
 
-    .card h2,
-    .card h3 {
-      margin-top: 0;
+    h2,
+    h3 {
+      margin: 0 0 12px;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .grid {
@@ -88,7 +100,7 @@
       gap: 10px;
     }
 
-    @media (max-width: 500px) {
+    @media (max-width: 540px) {
       .grid {
         grid-template-columns: 1fr;
       }
@@ -96,8 +108,8 @@
 
     label {
       display: block;
-      font-size: 13px;
       color: #666;
+      font-size: 13px;
       margin: 10px 0 5px;
     }
 
@@ -105,55 +117,61 @@
     select,
     textarea {
       width: 100%;
-      border: 1px solid #ddd;
-      border-radius: 12px;
       padding: 12px;
+      border: 1px solid #d8d8d4;
+      border-radius: 12px;
       background: white;
       color: #222;
     }
 
     textarea {
-      min-height: 80px;
+      min-height: 74px;
       resize: vertical;
     }
 
     .btn {
       width: 100%;
       border: 0;
-      border-radius: 14px;
-      padding: 14px;
-      margin-top: 12px;
+      border-radius: 13px;
+      padding: 13px 14px;
+      margin-top: 10px;
       background: #222;
       color: white;
-      font-weight: 700;
+      font-weight: 800;
     }
 
     .btn:disabled {
       opacity: .55;
-      cursor: default;
     }
 
     .btn.secondary {
-      background: #eee;
+      background: #efefec;
       color: #222;
     }
 
     .btn.danger {
-      background: #a42b2b;
+      background: var(--danger);
+    }
+
+    .btn.small {
+      width: auto;
+      margin: 0;
+      padding: 9px 11px;
+      font-size: 13px;
     }
 
     .tabs {
       position: fixed;
-      bottom: 0;
       left: 50%;
+      bottom: 0;
       transform: translateX(-50%);
-      max-width: 700px;
+      max-width: 760px;
       width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       background: white;
       border-top: 1px solid #ddd;
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      z-index: 20;
+      z-index: 30;
       padding-bottom: env(safe-area-inset-bottom);
     }
 
@@ -162,91 +180,19 @@
       background: white;
       padding: 13px 5px;
       color: #777;
-      font-size: 13px;
     }
 
     .tab.active {
       color: #111;
-      font-weight: 800;
-    }
-
-    .stat {
-      font-size: 28px;
-      font-weight: 800;
-    }
-
-    .muted {
-      color: #777;
-      font-size: 14px;
-    }
-
-    .error {
-      color: #a42b2b;
-      font-size: 14px;
-      margin-top: 12px;
-      white-space: pre-wrap;
-    }
-
-    .success {
-      color: #17682f;
-      font-size: 14px;
-      margin-top: 12px;
-    }
-
-    .pass {
-      border-bottom: 1px solid #eee;
-      padding: 14px 0;
-    }
-
-    .pass:last-child {
-      border-bottom: 0;
-    }
-
-    .pass-title {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .badge {
-      padding: 5px 9px;
-      border-radius: 99px;
-      background: #eee;
-      font-size: 12px;
-      white-space: nowrap;
-    }
-
-    .badge.active {
-      background: #dff4e5;
-      color: #17682f;
-    }
-
-    .badge.expired {
-      background: #fde1e1;
-      color: #9a2929;
-    }
-
-    .actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 10px;
-    }
-
-    .actions button {
-      flex: 1;
-      border: 0;
-      border-radius: 10px;
-      padding: 10px;
-      font-weight: 700;
+      font-weight: 900;
     }
 
     .login {
       min-height: 100vh;
       display: flex;
       align-items: center;
-      padding: 20px;
       background: #171717;
+      padding: 20px;
     }
 
     .login-box {
@@ -254,448 +200,918 @@
       max-width: 430px;
       margin: auto;
       background: white;
-      padding: 28px 20px;
-      border-radius: 24px;
+      border-radius: 22px;
+      padding: 26px 20px;
     }
 
     .login-box h1 {
-      margin-bottom: 5px;
+      margin: 0 0 4px;
+    }
+
+    .error {
+      color: var(--danger);
+      font-size: 13px;
+    }
+
+    .searchbar {
+      position: sticky;
+      top: 82px;
+      background: var(--bg);
+      z-index: 12;
+      padding-bottom: 8px;
+    }
+
+    .searchbox {
+      font-size: 17px;
+      padding: 14px;
+      border: 2px solid #222;
+    }
+
+    .filters {
+      display: flex;
+      gap: 7px;
+      overflow-x: auto;
+      padding: 8px 0 2px;
+    }
+
+    .chip {
+      border: 1px solid #d3d3cf;
+      background: white;
+      border-radius: 999px;
+      padding: 8px 11px;
+      white-space: nowrap;
+    }
+
+    .chip.active {
+      background: #222;
+      color: white;
+      border-color: #222;
+    }
+
+    .pass-card {
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+
+    .pass-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .pet {
+      font-size: 20px;
+      font-weight: 900;
+    }
+
+    .owner {
+      font-weight: 700;
+    }
+
+    .status {
+      font-size: 12px;
+      padding: 5px 8px;
+      border-radius: 999px;
+      background: #eee;
+      white-space: nowrap;
+    }
+
+    .status.active {
+      background: #dff4e5;
+      color: var(--ok);
+    }
+
+    .status.soon {
+      background: #fff0bf;
+      color: var(--warn);
+    }
+
+    .status.expired,
+    .status.completed {
+      background: #f9dddd;
+      color: var(--danger);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin: 12px 0;
+    }
+
+    .summary > div {
+      background: #f6f6f3;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .summary b {
+      display: block;
+      font-size: 18px;
+    }
+
+    .paper {
+      border: 2px solid #333;
+      border-radius: 22px;
+      padding: 16px;
+      background: white;
+    }
+
+    .paper-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 18px;
+    }
+
+    @media (max-width: 560px) {
+      .paper-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .paper-row {
+      font-size: 14px;
+      border-bottom: 1px dashed #ccc;
+      padding: 7px 0;
+    }
+
+    .rules {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .history-row {
+      border-top: 1px dashed #bbb;
+      padding: 12px 0;
+    }
+
+    .history-title {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-weight: 900;
+    }
+
+    .gift {
+      color: #8a5b00;
     }
 
     .signature-wrap {
-      border: 1px solid #ddd;
+      border: 2px solid #333;
       background: white;
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
     }
 
     #signatureCanvas {
       width: 100%;
-      height: 180px;
+      height: 320px;
       display: block;
       touch-action: none;
+      background: white;
     }
 
-    .signature-actions {
-      padding: 8px;
-      border-top: 1px solid #eee;
-    }
-
-    .signature-actions button {
-      border: 0;
-      padding: 8px 12px;
-      border-radius: 8px;
-    }
-
-    .search {
-      margin-bottom: 12px;
+    .signature-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 9px;
+      border-top: 1px solid #ddd;
     }
 
     .notice {
-      padding: 12px;
+      padding: 11px;
       border-radius: 12px;
-      background: #fff5cf;
-      color: #665000;
-      margin-bottom: 12px;
-      font-size: 14px;
+      background: #fff3c9;
+      color: #655000;
+      font-size: 13px;
+      margin: 10px 0;
+    }
+
+    .record-row {
+      padding: 12px 0;
+      border-bottom: 1px solid #eee;
+    }
+
+    .record-row:last-child {
+      border-bottom: 0;
+    }
+
+    .record-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .signed {
+      color: var(--ok);
+      font-weight: 800;
+    }
+
+    .unsigned {
+      color: var(--danger);
+      font-weight: 800;
+    }
+
+    .top-actions {
+      display: flex;
+      gap: 8px;
+    }
+
+    .top-actions .btn {
+      margin: 0;
     }
   </style>
 </head>
 
 <body>
 
-  <!-- 登入 -->
-  <div id="loginScreen" class="login">
-    <div class="login-box">
-      <h1>孩要有你</h1>
-      <p class="muted">寵物美容電子計次券管理系統</p>
+<div id="loginScreen" class="login">
+  <div class="login-box">
 
-      <label>登入 Email</label>
-      <input
-        id="loginEmail"
-        type="email"
-        autocomplete="username"
-      />
+    <h1>孩要有你</h1>
+    <p class="muted">電子計次券</p>
 
-      <label>密碼</label>
-      <input
-        id="loginPassword"
-        type="password"
-        autocomplete="current-password"
-      />
+    <label>登入 Email</label>
+    <input
+      id="loginEmail"
+      type="email"
+      autocomplete="username"
+    >
 
-      <button
-        id="loginButton"
-        class="btn"
-        type="button"
-        onclick="login()"
-      >
-        登入系統
-      </button>
+    <label>密碼</label>
+    <input
+      id="loginPassword"
+      type="password"
+      autocomplete="current-password"
+    >
 
-      <p id="loginMessage" class="muted"></p>
-    </div>
+    <button
+      id="loginButton"
+      class="btn"
+      type="button"
+      onclick="login()"
+    >
+      登入系統
+    </button>
+
+    <p id="loginMessage" class="muted"></p>
+
   </div>
+</div>
 
-  <!-- 主系統 -->
-  <div id="mainApp" class="app hidden">
+<div id="mainApp" class="app hidden">
 
-    <header>
-      <h1>孩要有你｜電子計次券</h1>
-      <p id="loginUser"></p>
-    </header>
+  <header>
+    <h1>孩要有你｜電子計次券</h1>
+    <p id="loginUser"></p>
+  </header>
 
-    <main>
+  <main>
 
-      <!-- 總覽 -->
-      <section id="dashboardPage" class="page">
+    <!-- 查券 / 簽名 -->
+    <section id="searchPage" class="page">
 
-        <div class="card">
-          <h2>今日總覽</h2>
+      <div class="searchbar">
 
-          <div class="grid">
-            <div>
-              <div id="activePassCount" class="stat">0</div>
-              <div class="muted">有效計次券</div>
-            </div>
+        <input
+          id="quickSearch"
+          class="searchbox"
+          placeholder="搜尋毛孩、飼主、電話、犬種"
+          oninput="renderSearchResults()"
+        >
 
-            <div>
-              <div id="todayUsageCount" class="stat">0</div>
-              <div class="muted">今日使用紀錄</div>
-            </div>
+        <div class="filters">
+
+          <button
+            class="chip active"
+            data-filter="active"
+            onclick="setPassFilter('active', this)"
+          >
+            有效
+          </button>
+
+          <button
+            class="chip"
+            data-filter="all"
+            onclick="setPassFilter('all', this)"
+          >
+            全部
+          </button>
+
+          <button
+            class="chip"
+            data-filter="soon"
+            onclick="setPassFilter('soon', this)"
+          >
+            7天內到期
+          </button>
+
+          <button
+            class="chip"
+            data-filter="expired"
+            onclick="setPassFilter('expired', this)"
+          >
+            已到期
+          </button>
+
+          <button
+            class="chip"
+            data-filter="completed"
+            onclick="setPassFilter('completed', this)"
+          >
+            已用完
+          </button>
+
+        </div>
+      </div>
+
+      <div
+        id="selectedPassPanel"
+        class="hidden"
+      ></div>
+
+      <div id="searchResults"></div>
+
+    </section>
+
+    <!-- 開券 -->
+    <section
+      id="createPage"
+      class="page hidden"
+    >
+
+      <div class="card">
+
+        <h2>建立電子計次券</h2>
+
+        <div class="grid">
+
+          <div>
+            <label>飼主姓名</label>
+            <input id="ownerName">
           </div>
+
+          <div>
+            <label>電話</label>
+            <input
+              id="phone"
+              type="tel"
+            >
+          </div>
+
+          <div>
+            <label>毛孩名字</label>
+            <input id="petName">
+          </div>
+
+          <div>
+            <label>犬種</label>
+            <input id="breed">
+          </div>
+
+          <div>
+            <label>計次券金額</label>
+            <input
+              id="passAmount"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>加購造型</label>
+            <input id="stylingAddon">
+          </div>
+
+          <div>
+            <label>加購造型金額</label>
+            <input
+              id="stylingAddonAmount"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>計次券加購</label>
+            <input
+              id="passAddonAmount"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>SPA 加購</label>
+            <input
+              id="spaAddonAmount"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>總金額</label>
+            <input
+              id="totalPaid"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>付款日</label>
+            <input
+              id="paymentDate"
+              type="date"
+              onchange="autoExpiry()"
+            >
+          </div>
+
+          <div>
+            <label>使用期限</label>
+            <input
+              id="expiryDate"
+              type="date"
+            >
+          </div>
+
+          <div>
+            <label>洗澡差額</label>
+            <input
+              id="bathExtraAmount"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>大美差額</label>
+            <input
+              id="groomExtraAmount"
+              type="number"
+            >
+          </div>
+
         </div>
 
-        <div class="card">
-          <h3>即將到期</h3>
-          <div id="expiryList" class="muted">
-            讀取中...
-          </div>
+        <label>
+          <input
+            id="sharedPass"
+            type="checkbox"
+            style="width:auto"
+            onchange="autoExpiry()"
+          >
+          同價位兩隻毛孩共用（期限25天）
+        </label>
+
+        <label>另一隻毛孩名字</label>
+        <input id="sharedPetName">
+
+        <label>備註</label>
+        <textarea id="passNotes"></textarea>
+
+        <div class="notice">
+          一般計次券自動45天；共用券自動25天。第5次為贈送。
         </div>
 
         <button
-          class="btn danger"
+          class="btn"
           type="button"
-          onclick="logout()"
+          onclick="createPass()"
         >
-          登出
+          建立計次券
         </button>
 
-      </section>
+      </div>
+    </section>
 
-      <!-- 計次券 -->
-      <section id="passesPage" class="page hidden">
+    <!-- 紀錄 -->
+    <section
+      id="recordsPage"
+      class="page hidden"
+    >
 
-        <div class="card">
-          <h2>建立電子計次券</h2>
+      <div class="card">
 
-          <div class="grid">
+        <h2>消費／簽名紀錄</h2>
 
-            <div>
-              <label>飼主姓名</label>
-              <input id="ownerName" />
-            </div>
+        <div class="grid">
 
-            <div>
-              <label>電話</label>
-              <input id="phone" type="tel" />
-            </div>
-
-            <div>
-              <label>寵物名字</label>
-              <input id="petName" />
-            </div>
-
-            <div>
-              <label>品種</label>
-              <input id="breed" />
-            </div>
-
-            <div>
-              <label>付款日期</label>
-              <input id="paymentDate" type="date" />
-            </div>
-
-            <div>
-              <label>到期日期</label>
-              <input id="expiryDate" type="date" />
-            </div>
-
-            <div>
-              <label>計次券金額</label>
-              <input id="passAmount" type="number" />
-            </div>
-
-            <div>
-              <label>實收金額</label>
-              <input id="totalPaid" type="number" />
-            </div>
-
-            <div>
-              <label>洗澡單次原價</label>
-              <input id="bathPrice" type="number" />
-            </div>
-
-            <div>
-              <label>美容單次原價</label>
-              <input id="groomPrice" type="number" />
-            </div>
-
+          <div>
+            <label>日期</label>
+            <input
+              id="recordDate"
+              type="date"
+              onchange="renderRecords()"
+            >
           </div>
 
-          <label>備註</label>
-          <textarea id="passNotes"></textarea>
+          <div>
+            <label>搜尋</label>
+            <input
+              id="recordSearch"
+              placeholder="毛孩、飼主、電話"
+              oninput="renderRecords()"
+            >
+          </div>
+
+        </div>
+
+        <div class="filters">
 
           <button
-            class="btn"
-            type="button"
-            onclick="createPass()"
+            class="chip active"
+            onclick="setRecordFilter('all', this)"
           >
-            建立計次券（買 4 送 1）
+            全部
           </button>
-        </div>
-
-        <div class="card">
-          <h2>客戶與寵物</h2>
-
-          <input
-            id="passSearch"
-            class="search"
-            placeholder="搜尋飼主、電話、寵物名字"
-            oninput="renderPasses()"
-          />
-
-          <div id="passesList">
-            讀取中...
-          </div>
-        </div>
-
-      </section>
-
-      <!-- 使用 -->
-      <section id="usagePage" class="page hidden">
-
-        <div class="card">
-          <h2>使用計次券</h2>
-
-          <label>選擇計次券</label>
-          <select id="usagePass"></select>
-
-          <div
-            id="selectedPassInfo"
-            class="notice hidden"
-          ></div>
-
-          <div class="grid">
-
-            <div>
-              <label>服務日期</label>
-              <input id="serviceDate" type="date" />
-            </div>
-
-            <div>
-              <label>服務項目</label>
-              <select id="serviceType">
-                <option value="洗澡">洗澡</option>
-                <option value="美容">美容</option>
-                <option value="SPA">SPA</option>
-                <option value="其他">其他</option>
-              </select>
-            </div>
-
-            <div>
-              <label>本次服務原價</label>
-              <input id="originalPrice" type="number" />
-            </div>
-
-            <div>
-              <label>本次扣抵金額</label>
-              <input id="redeemAmount" type="number" />
-            </div>
-
-            <div>
-              <label>補差額</label>
-              <input
-                id="extraAmount"
-                type="number"
-                value="0"
-              />
-            </div>
-
-            <div>
-              <label>經手人員</label>
-              <input id="operatorName" />
-            </div>
-
-          </div>
-
-          <label>備註</label>
-          <textarea id="usageNotes"></textarea>
-
-          <label>顧客簽名</label>
-
-          <div class="signature-wrap">
-            <canvas id="signatureCanvas"></canvas>
-
-            <div class="signature-actions">
-              <button
-                type="button"
-                onclick="clearSignature()"
-              >
-                清除簽名
-              </button>
-            </div>
-          </div>
 
           <button
-            class="btn"
-            type="button"
-            onclick="createUsage()"
+            class="chip"
+            onclick="setRecordFilter('redeemed', this)"
           >
-            確認使用計次券
+            有折抵
           </button>
-        </div>
-
-        <div class="card">
-          <h2>最近使用紀錄</h2>
-          <div id="transactionsList">
-            讀取中...
-          </div>
-        </div>
-
-      </section>
-
-      <!-- 設定 -->
-      <section id="settingsPage" class="page hidden">
-
-        <div class="card">
-          <h2>系統設定</h2>
-
-          <label>一般計次券有效天數</label>
-          <input
-            id="normalExpiryDays"
-            type="number"
-          />
-
-          <label>共用計次券有效天數</label>
-          <input
-            id="sharedExpiryDays"
-            type="number"
-          />
-
-          <label>資料保留月數</label>
-          <input
-            id="retentionMonths"
-            type="number"
-          />
 
           <button
-            class="btn"
-            type="button"
-            onclick="saveSettings()"
+            class="chip"
+            onclick="setRecordFilter('notRedeemed', this)"
           >
-            儲存設定
+            未折抵
           </button>
+
+          <button
+            class="chip"
+            onclick="setRecordFilter('signed', this)"
+          >
+            已簽名
+          </button>
+
+          <button
+            class="chip"
+            onclick="setRecordFilter('unsigned', this)"
+          >
+            未簽名
+          </button>
+
         </div>
 
-      </section>
+      </div>
 
-    </main>
+      <div class="card">
 
-    <nav class="tabs">
-      <button
-        class="tab active"
-        onclick="showPage('dashboard', this)"
-      >
-        總覽
-      </button>
+        <div
+          id="recordSummary"
+          class="muted"
+        ></div>
 
-      <button
-        class="tab"
-        onclick="showPage('passes', this)"
-      >
-        計次券
-      </button>
+        <div id="recordsList"></div>
+
+      </div>
 
       <button
-        class="tab"
-        onclick="showPage('usage', this)"
+        class="btn danger"
+        type="button"
+        onclick="logout()"
       >
-        使用
+        登出
       </button>
 
-      <button
-        class="tab"
-        onclick="showPage('settings', this)"
-      >
-        設定
-      </button>
-    </nav>
+    </section>
 
+  </main>
+
+  <nav class="tabs">
+
+    <button
+      class="tab active"
+      onclick="showPage('search', this)"
+    >
+      查券／簽名
+    </button>
+
+    <button
+      class="tab"
+      onclick="showPage('create', this)"
+    >
+      開券
+    </button>
+
+    <button
+      class="tab"
+      onclick="showPage('records', this)"
+    >
+      紀錄
+    </button>
+
+  </nav>
+
+</div>
+
+<!-- 結帳 / 簽名視窗 -->
+<div
+  id="usageModal"
+  class="hidden"
+>
+
+  <div
+    style="
+      position:fixed;
+      inset:0;
+      background:rgba(0,0,0,.55);
+      z-index:100;
+      padding:12px;
+      overflow:auto;
+    "
+  >
+
+    <div
+      style="
+        max-width:700px;
+        margin:20px auto;
+        background:#f5f5f3;
+        border-radius:20px;
+        padding:14px;
+      "
+    >
+
+      <div class="top-actions">
+
+        <button
+          class="btn secondary"
+          type="button"
+          onclick="closeUsage()"
+        >
+          返回
+        </button>
+
+      </div>
+
+      <div class="card">
+
+        <h2>本次消費</h2>
+
+        <div
+          id="usagePassInfo"
+          class="notice"
+        ></div>
+
+        <div class="grid">
+
+          <div>
+            <label>日期</label>
+            <input
+              id="serviceDate"
+              type="date"
+            >
+          </div>
+
+          <div>
+            <label>本次是否折抵計次券</label>
+
+            <select
+              id="redeemedSelect"
+              onchange="updateUsageMode()"
+            >
+              <option value="true">
+                有折抵
+              </option>
+
+              <option value="false">
+                本次消費但不折抵
+              </option>
+            </select>
+          </div>
+
+          <div>
+
+            <label>服務項目</label>
+
+            <select
+              id="serviceType"
+              onchange="autoExtraAmount()"
+            >
+              <option value="洗澡">
+                洗澡
+              </option>
+
+              <option value="大美">
+                大美
+              </option>
+
+              <option value="SPA">
+                SPA
+              </option>
+
+              <option value="其他">
+                其他
+              </option>
+            </select>
+
+          </div>
+
+          <div>
+            <label>本次服務原價</label>
+            <input
+              id="originalPrice"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>本次扣抵金額</label>
+            <input
+              id="redeemAmount"
+              type="number"
+            >
+          </div>
+
+          <div>
+            <label>補差額</label>
+            <input
+              id="extraAmount"
+              type="number"
+              value="0"
+            >
+          </div>
+
+          <div>
+            <label>經手人員</label>
+            <input id="operatorName">
+          </div>
+
+        </div>
+
+        <label>備註</label>
+        <textarea id="usageNotes"></textarea>
+
+        <label style="font-size:16px;font-weight:800">
+          顧客簽名
+        </label>
+
+        <div class="signature-wrap">
+
+          <canvas id="signatureCanvas"></canvas>
+
+          <div class="signature-footer">
+
+            <span
+              id="signatureState"
+              class="muted"
+            >
+              尚未簽名
+            </span>
+
+            <button
+              class="btn small secondary"
+              type="button"
+              onclick="clearSignature()"
+            >
+              清除重簽
+            </button>
+
+          </div>
+
+        </div>
+
+        <button
+          class="btn"
+          type="button"
+          onclick="saveUsage()"
+        >
+          儲存本次紀錄
+        </button>
+
+      </div>
+    </div>
   </div>
+</div>
 
-  <script>
-    /*
-      ==================================================
-      Supabase
-      全站只建立這一次，不再重複宣告
-      ==================================================
-    */
+<script>
 
-    const SUPABASE_URL =
-      "https://kytdrgmwyupjzjdyjhjh.supabase.co";
+const SUPABASE_URL =
+  "https://kytdrgmwyupjzjdyjhjh.supabase.co";
 
-    const SUPABASE_PUBLISHABLE_KEY =
-      "sb_publishable_ZEoEcNmr5dMoZtIEGdPCfA_ffav8l9O";
+const SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_ZEoEcNmr5dMoZtIEGdPCfA_ffav8l9O";
 
-    let client = null;
+let client = null;
 
-    let passes = [];
-    let transactions = [];
-    let drawing = false;
-    let signatureHasInk = false;
+let passes = [];
+let transactions = [];
 
-    function setLoginMessage(message, type = "muted") {
-      const el = document.getElementById("loginMessage");
+let selectedPass = null;
 
-      el.textContent = message;
-      el.className = type;
-    }
+let passFilter = "active";
+let recordFilter = "all";
 
-    function today() {
-      return new Date().toISOString().slice(0, 10);
-    }
+let drawing = false;
+let signatureHasInk = false;
 
-    function numberOrZero(id) {
-      return Number(
-        document.getElementById(id).value || 0
+
+/* =========================
+   基本工具
+========================= */
+
+function today() {
+  return new Date()
+    .toISOString()
+    .slice(0, 10);
+}
+
+function esc(value) {
+
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function money(value) {
+
+  return Number(value || 0)
+    .toLocaleString("zh-TW");
+}
+
+function num(id) {
+
+  return Number(
+    document
+      .getElementById(id)
+      .value || 0
+  );
+}
+
+function addDays(dateString, days) {
+
+  if (!dateString) {
+    return "";
+  }
+
+  const d =
+    new Date(
+      dateString +
+      "T00:00:00"
+    );
+
+  d.setDate(
+    d.getDate() +
+    days
+  );
+
+  return d
+    .toISOString()
+    .slice(0, 10);
+}
+
+function daysUntil(dateString) {
+
+  if (!dateString) {
+    return 9999;
+  }
+
+  const a =
+    new Date(
+      today() +
+      "T00:00:00"
+    );
+
+  const b =
+    new Date(
+      dateString +
+      "T00:00:00"
+    );
+
+  return Math.ceil(
+    (b - a) /
+    86400000
+  );
+}
+
+
+/* =========================
+   初始化
+========================= */
+
+async function init() {
+
+  try {
+
+    if (!window.supabase) {
+
+      throw new Error(
+        "Supabase 載入失敗"
       );
     }
 
-    function escapeHtml(value) {
-      return String(value ?? "")
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
-    }
-
-    /*
-      ==================================================
-      初始化
-      ==================================================
-    */
-
-    async function initializeApp() {
-      try {
-        if (!window.supabase) {
-          throw new Error(
-            "Supabase 程式庫載入失敗，請確認網路連線後重新整理。"
-          );
-        }
-
-        client = window.supabase.createClient(
+    client =
+      window.supabase
+        .createClient(
           SUPABASE_URL,
           SUPABASE_PUBLISHABLE_KEY,
           {
@@ -707,594 +1123,1963 @@
           }
         );
 
-        document.getElementById("paymentDate").value =
-          today();
+    document
+      .getElementById("paymentDate")
+      .value =
+      today();
 
-        document.getElementById("serviceDate").value =
-          today();
+    document
+      .getElementById("serviceDate")
+      .value =
+      today();
 
-        await checkSession();
+    document
+      .getElementById("recordDate")
+      .value =
+      today();
 
-      } catch (error) {
-        console.error(error);
+    autoExpiry();
 
-        setLoginMessage(
-          "系統初始化失敗：" +
-          (error?.message || String(error)),
-          "error"
-        );
-      }
+    const {
+      data,
+      error
+    } =
+      await client
+        .auth
+        .getSession();
+
+    if (error) {
+      throw error;
     }
 
-    /*
-      ==================================================
-      登入
-      ==================================================
-    */
+    if (
+      data?.session?.user
+    ) {
 
-    async function checkSession() {
-      if (!client) return;
-
-      try {
-        const {
-          data,
-          error
-        } = await client.auth.getSession();
-
-        if (error) {
-          throw error;
-        }
-
-        if (data?.session?.user) {
-          await openApp(data.session.user);
-        }
-
-      } catch (error) {
-        console.error("Session error:", error);
-
-        setLoginMessage(
-          "登入狀態讀取失敗：" +
-          (error?.message || String(error)),
-          "error"
-        );
-      }
-    }
-
-    async function login() {
-      const button =
-        document.getElementById("loginButton");
-
-      const email =
-        document
-          .getElementById("loginEmail")
-          .value
-          .trim();
-
-      const password =
-        document
-          .getElementById("loginPassword")
-          .value;
-
-      if (!email || !password) {
-        setLoginMessage(
-          "請輸入 Email 與密碼。",
-          "error"
-        );
-        return;
-      }
-
-      if (!client) {
-        setLoginMessage(
-          "系統尚未完成連線，請重新整理網頁。",
-          "error"
-        );
-        return;
-      }
-
-      button.disabled = true;
-      button.textContent = "登入中...";
-
-      setLoginMessage("正在登入...", "muted");
-
-      try {
-        const {
-          data,
-          error
-        } = await client.auth.signInWithPassword({
-          email,
-          password
-        });
-
-        if (error) {
-          throw error;
-        }
-
-        if (!data?.user) {
-          throw new Error(
-            "Supabase 沒有回傳登入使用者。"
-          );
-        }
-
-        setLoginMessage(
-          "登入成功",
-          "success"
-        );
-
-        await openApp(data.user);
-
-      } catch (error) {
-        console.error("Login error:", error);
-
-        setLoginMessage(
-          "登入失敗：" +
-          (error?.message || String(error)),
-          "error"
-        );
-
-      } finally {
-        button.disabled = false;
-        button.textContent = "登入系統";
-      }
-    }
-
-    async function logout() {
-      try {
-        if (client) {
-          await client.auth.signOut();
-        }
-      } finally {
-        location.reload();
-      }
-    }
-
-    /*
-      ==================================================
-      進入主系統
-      ==================================================
-    */
-
-    async function openApp(user) {
-      document
-        .getElementById("loginScreen")
-        .classList
-        .add("hidden");
-
-      document
-        .getElementById("mainApp")
-        .classList
-        .remove("hidden");
-
-      document.getElementById("loginUser").textContent =
-        "登入帳號：" + (user?.email || "");
-
-      try {
-        await refreshData();
-      } catch (error) {
-        console.error(error);
-        alert(
-          "資料讀取發生問題：" +
-          (error?.message || String(error))
-        );
-      }
-
-      setupSignature();
-    }
-
-    function showPage(name, button) {
-      document
-        .querySelectorAll("main > section")
-        .forEach(section => {
-          section.classList.add("hidden");
-        });
-
-      document
-        .getElementById(name + "Page")
-        .classList
-        .remove("hidden");
-
-      document
-        .querySelectorAll(".tab")
-        .forEach(tab => {
-          tab.classList.remove("active");
-        });
-
-      button.classList.add("active");
-
-      if (name === "usage") {
-        setTimeout(setupSignature, 50);
-      }
-    }
-
-    /*
-      ==================================================
-      讀取資料
-      ==================================================
-    */
-
-    async function refreshData() {
-      const passResult =
-        await client
-          .from("passes")
-          .select("*")
-          .order(
-            "created_at",
-            { ascending: false }
-          );
-
-      if (passResult.error) {
-        throw new Error(
-          "計次券讀取失敗：" +
-          passResult.error.message
-        );
-      }
-
-      passes = passResult.data || [];
-
-      const transactionResult =
-        await client
-          .from("transactions")
-          .select("*")
-          .order(
-            "created_at",
-            { ascending: false }
-          );
-
-      if (transactionResult.error) {
-        throw new Error(
-          "使用紀錄讀取失敗：" +
-          transactionResult.error.message
-        );
-      }
-
-      transactions =
-        transactionResult.data || [];
-
-      renderPasses();
-      renderUsageOptions();
-      renderTransactions();
-      renderDashboard();
-
-      await loadSettings();
-    }
-
-    /*
-      ==================================================
-      計次邏輯
-      買 4 送 1，共 5 次
-      ==================================================
-    */
-
-    function getUsedCount(passId) {
-      return transactions.filter(t =>
-        t.pass_id === passId &&
-        !t.voided
-      ).length;
-    }
-
-    function getRemaining(passId) {
-      return Math.max(
-        0,
-        5 - getUsedCount(passId)
+      await openApp(
+        data.session.user
       );
     }
 
-    function getStatus(pass) {
-      if (pass.status === "archived") {
-        return "archived";
-      }
+  } catch (error) {
 
-      if (
-        pass.expiry_date &&
-        pass.expiry_date < today()
-      ) {
-        return "expired";
-      }
-
-      if (getRemaining(pass.id) <= 0) {
-        return "completed";
-      }
-
-      return "active";
-    }
-
-    /*
-      ==================================================
-      總覽
-      ==================================================
-    */
-
-    function renderDashboard() {
-      const active =
-        passes.filter(
-          p => getStatus(p) === "active"
+    const message =
+      document
+        .getElementById(
+          "loginMessage"
         );
 
-      document.getElementById(
-        "activePassCount"
-      ).textContent = active.length;
-
-      document.getElementById(
-        "todayUsageCount"
-      ).textContent =
-        transactions.filter(t =>
-          t.service_date === today() &&
-          !t.voided
-        ).length;
-
-      const future = new Date();
-      future.setDate(future.getDate() + 30);
-
-      const limit =
-        future.toISOString().slice(0, 10);
-
-      const expiring =
-        active
-          .filter(p =>
-            p.expiry_date &&
-            p.expiry_date >= today() &&
-            p.expiry_date <= limit
-          )
-          .sort((a, b) =>
-            a.expiry_date.localeCompare(
-              b.expiry_date
-            )
-          );
-
-      const box =
-        document.getElementById(
-          "expiryList"
-        );
-
-      if (!expiring.length) {
-        box.textContent =
-          "目前沒有 30 天內即將到期的計次券。";
-        return;
-      }
-
-      box.innerHTML =
-        expiring.map(p => `
-          <div class="pass">
-            <strong>
-              ${escapeHtml(p.pet_name || "")}
-            </strong>
-            ｜${escapeHtml(p.owner_name || "")}
-            <br>
-
-            <span class="muted">
-              到期：${p.expiry_date}
-              ・剩餘 ${getRemaining(p.id)} 次
-            </span>
-          </div>
-        `).join("");
-    }
-
-    /*
-      ==================================================
-      建立計次券
-      ==================================================
-    */
-
-    async function createPass() {
-      const ownerName =
-        document
-          .getElementById("ownerName")
-          .value
-          .trim();
-
-      const petName =
-        document
-          .getElementById("petName")
-          .value
-          .trim();
-
-      if (!ownerName || !petName) {
-        alert(
-          "請至少填寫飼主姓名與寵物名字"
-        );
-        return;
-      }
-
-      const row = {
-        owner_name: ownerName,
-
-        phone:
-          document
-            .getElementById("phone")
-            .value
-            .trim(),
-
-        pet_name: petName,
-
-        breed:
-          document
-            .getElementById("breed")
-            .value
-            .trim(),
-
-        payment_date:
-          document
-            .getElementById("paymentDate")
-            .value || null,
-
-        expiry_date:
-          document
-            .getElementById("expiryDate")
-            .value || null,
-
-        pass_amount:
-          numberOrZero("passAmount"),
-
-        total_paid:
-          numberOrZero("totalPaid"),
-
-        bath_price:
-          numberOrZero("bathPrice"),
-
-        groom_price:
-          numberOrZero("groomPrice"),
-
-        notes:
-          document
-            .getElementById("passNotes")
-            .value
-            .trim(),
-
-        status: "active"
-      };
-
-      const {
-        error
-      } = await client
-        .from("passes")
-        .insert(row);
-
-      if (error) {
-        alert(
-          "建立失敗：" +
-          error.message
-        );
-        return;
-      }
-
-      alert(
-        "計次券建立成功，總使用次數為 5 次。"
+    message.textContent =
+      "系統初始化失敗：" +
+      (
+        error?.message ||
+        String(error)
       );
 
-      [
-        "ownerName",
-        "phone",
-        "petName",
-        "breed",
-        "passAmount",
-        "totalPaid",
-        "bathPrice",
-        "groomPrice",
-        "passNotes"
-      ].forEach(id => {
-        document.getElementById(id).value = "";
+    message.className =
+      "error";
+  }
+}
+
+
+/* =========================
+   登入
+========================= */
+
+async function login() {
+
+  const email =
+    document
+      .getElementById(
+        "loginEmail"
+      )
+      .value
+      .trim();
+
+  const password =
+    document
+      .getElementById(
+        "loginPassword"
+      )
+      .value;
+
+  const button =
+    document
+      .getElementById(
+        "loginButton"
+      );
+
+  if (
+    !email ||
+    !password
+  ) {
+
+    document
+      .getElementById(
+        "loginMessage"
+      )
+      .textContent =
+      "請輸入 Email 與密碼";
+
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent =
+    "登入中...";
+
+  const {
+    data,
+    error
+  } =
+    await client
+      .auth
+      .signInWithPassword({
+        email,
+        password
       });
 
-      document.getElementById(
-        "paymentDate"
-      ).value = today();
+  button.disabled = false;
+  button.textContent =
+    "登入系統";
 
-      await refreshData();
-    }
+  if (error) {
 
-    /*
-      ==================================================
-      計次券列表
-      ==================================================
-    */
+    const message =
+      document
+        .getElementById(
+          "loginMessage"
+        );
 
-    function renderPasses() {
-      const keyword =
-        document
-          .getElementById("passSearch")
-          .value
-          .trim()
-          .toLowerCase();
+    message.textContent =
+      "登入失敗：" +
+      error.message;
 
-      const filtered =
-        passes.filter(p => {
+    message.className =
+      "error";
+
+    return;
+  }
+
+  await openApp(
+    data.user
+  );
+}
+
+async function logout() {
+
+  await client
+    .auth
+    .signOut();
+
+  location.reload();
+}
+
+
+/* =========================
+   進入主系統
+========================= */
+
+async function openApp(user) {
+
+  document
+    .getElementById(
+      "loginScreen"
+    )
+    .classList
+    .add("hidden");
+
+  document
+    .getElementById(
+      "mainApp"
+    )
+    .classList
+    .remove("hidden");
+
+  document
+    .getElementById(
+      "loginUser"
+    )
+    .textContent =
+    "登入帳號：" +
+    (
+      user?.email ||
+      ""
+    );
+
+  try {
+
+    await refreshData();
+
+  } catch (error) {
+
+    alert(
+      "資料讀取失敗：" +
+      (
+        error?.message ||
+        String(error)
+      )
+    );
+  }
+}
+
+
+/* =========================
+   讀取資料
+========================= */
+
+async function refreshData() {
+
+  const passResult =
+    await client
+      .from("passes")
+      .select("*")
+      .order(
+        "created_at",
+        {
+          ascending: false
+        }
+      );
+
+  if (
+    passResult.error
+  ) {
+
+    throw new Error(
+      "計次券讀取失敗：" +
+      passResult.error.message
+    );
+  }
+
+  passes =
+    passResult.data ||
+    [];
+
+  const transactionResult =
+    await client
+      .from("transactions")
+      .select("*")
+      .order(
+        "created_at",
+        {
+          ascending: false
+        }
+      );
+
+  if (
+    transactionResult.error
+  ) {
+
+    throw new Error(
+      "紀錄讀取失敗：" +
+      transactionResult
+        .error
+        .message
+    );
+  }
+
+  transactions =
+    transactionResult.data ||
+    [];
+
+  renderSearchResults();
+  renderRecords();
+
+  if (selectedPass) {
+
+    selectedPass =
+      passes.find(
+        p =>
+          p.id ===
+          selectedPass.id
+      ) ||
+      selectedPass;
+
+    renderSelectedPass();
+  }
+}
+
+
+/* =========================
+   次數
+========================= */
+
+function usedTransactions(
+  passId
+) {
+
+  return transactions
+    .filter(
+      t =>
+        t.pass_id ===
+        passId &&
+        !t.voided &&
+        t.redeemed !== false
+    );
+}
+
+function getUsedCount(
+  passId
+) {
+
+  return usedTransactions(
+    passId
+  ).length;
+}
+
+function totalUses(pass) {
+
+  return Number(
+    pass.total_uses ||
+    5
+  );
+}
+
+function getRemaining(
+  pass
+) {
+
+  return Math.max(
+    0,
+    totalUses(pass) -
+    getUsedCount(pass.id)
+  );
+}
+
+
+/* =========================
+   計次券狀態
+========================= */
+
+function getPassStatus(
+  pass
+) {
+
+  if (
+    pass.status ===
+    "archived"
+  ) {
+    return "archived";
+  }
+
+  if (
+    getRemaining(pass) <= 0
+  ) {
+    return "completed";
+  }
+
+  const days =
+    daysUntil(
+      pass.expiry_date
+    );
+
+  if (days < 0) {
+    return "expired";
+  }
+
+  if (days <= 7) {
+    return "soon";
+  }
+
+  return "active";
+}
+
+function statusText(
+  status
+) {
+
+  return {
+    active: "有效",
+    soon: "7天內到期",
+    expired: "已到期",
+    completed: "已用完",
+    archived: "已封存"
+  }[status] ||
+  status;
+}
+
+
+/* =========================
+   快速搜尋
+========================= */
+
+function setPassFilter(
+  filter,
+  button
+) {
+
+  passFilter =
+    filter;
+
+  document
+    .querySelectorAll(
+      "[data-filter]"
+    )
+    .forEach(
+      element => {
+        element
+          .classList
+          .remove("active");
+      }
+    );
+
+  button
+    .classList
+    .add("active");
+
+  renderSearchResults();
+}
+
+function renderSearchResults() {
+
+  const searchBox =
+    document
+      .getElementById(
+        "quickSearch"
+      );
+
+  if (!searchBox) {
+    return;
+  }
+
+  const keyword =
+    searchBox
+      .value
+      .trim()
+      .toLowerCase();
+
+  let list =
+    passes
+      .filter(
+        pass => {
+
           const text = [
-            p.owner_name,
-            p.phone,
-            p.pet_name,
-            p.breed
+            pass.pet_name,
+            pass.owner_name,
+            pass.phone,
+            pass.breed,
+            pass.shared_pet_name
           ]
             .join(" ")
             .toLowerCase();
 
-          return text.includes(keyword);
-        });
-
-      const box =
-        document.getElementById(
-          "passesList"
-        );
-
-      if (!filtered.length) {
-        box.innerHTML =
-          `<div class="muted">目前沒有資料</div>`;
-        return;
-      }
-
-      box.innerHTML =
-        filtered.map(p => {
-          const remaining =
-            getRemaining(p.id);
+          if (
+            keyword &&
+            !text.includes(
+              keyword
+            )
+          ) {
+            return false;
+          }
 
           const status =
-            getStatus(p);
+            getPassStatus(
+              pass
+            );
 
-          let statusText = "有效";
-
-          if (status === "expired") {
-            statusText = "已到期";
+          if (
+            passFilter ===
+            "all"
+          ) {
+            return true;
           }
 
-          if (status === "completed") {
-            statusText = "已用完";
+          if (
+            passFilter ===
+            "active"
+          ) {
+
+            return (
+              status ===
+              "active" ||
+              status ===
+              "soon"
+            );
           }
 
-          if (status === "archived") {
-            statusText = "已封存";
-          }
+          return (
+            status ===
+            passFilter
+          );
+        }
+      );
+
+  const box =
+    document
+      .getElementById(
+        "searchResults"
+      );
+
+  if (!list.length) {
+
+    box.innerHTML =
+      '<div class="card muted">找不到符合的計次券</div>';
+
+    return;
+  }
+
+  box.innerHTML =
+    list
+      .map(
+        pass => {
+
+          const status =
+            getPassStatus(
+              pass
+            );
+
+          const remaining =
+            getRemaining(
+              pass
+            );
 
           return `
-            <div class="pass">
+            <div
+              class="pass-card"
+              onclick="selectPass('${pass.id}')"
+            >
 
-              <div class="pass-title">
+              <div class="pass-top">
+
                 <div>
-                  <strong>
-                    ${escapeHtml(
-                      p.pet_name || ""
-                    )}
-                  </strong>
 
-                  <span class="muted">
-                    ・${escapeHtml(
-                      p.owner_name || ""
+                  <div class="pet">
+                    ${esc(
+                      pass.pet_name ||
+                      ""
                     )}
-                  </span>
+                  </div>
+
+                  <div class="owner">
+                    ${esc(
+                      pass.owner_name ||
+                      ""
+                    )}
+                    ・
+                    ${esc(
+                      pass.phone ||
+                      ""
+                    )}
+                  </div>
+
+                  <div class="muted">
+                    ${esc(
+                      pass.breed ||
+                      ""
+                    )}
+                    ${
+                      pass.shared_pass
+                        ? " ・ 共用券"
+                        : ""
+                    }
+                  </div>
+
                 </div>
 
-                <span class="badge ${status}">
-                  ${statusText}
+                <span
+                  class="status ${status}"
+                >
+                  ${statusText(
+                    status
+                  )}
                 </span>
+
               </div>
 
+              <div class="summary">
+
+                <div>
+                  <span class="muted">
+                    剩餘
+                  </span>
+
+                  <b>
+                    ${remaining}
+                    /
+                    ${totalUses(
+                      pass
+                    )}
+                  </b>
+                </div>
+
+                <div>
+                  <span class="muted">
+                    到期
+                  </span>
+
+                  <b style="font-size:14px">
+                    ${
+                      pass.expiry_date ||
+                      "-"
+                    }
+                  </b>
+                </div>
+
+                <div>
+                  <span class="muted">
+                    差額
+                  </span>
+
+                  <b style="font-size:14px">
+                    洗
+                    ${money(
+                      pass.bath_extra_amount
+                    )}
+                    <br>
+                    美
+                    ${money(
+                      pass.groom_extra_amount
+                    )}
+                  </b>
+                </div>
+
+              </div>
+
+              <button
+                class="btn"
+                type="button"
+              >
+                查看／結帳簽名
+              </button>
+
+            </div>
+          `;
+        }
+      )
+      .join("");
+}
+
+
+/* =========================
+   查看單張計次券
+========================= */
+
+function selectPass(id) {
+
+  selectedPass =
+    passes.find(
+      pass =>
+        pass.id === id
+    );
+
+  renderSelectedPass();
+
+  document
+    .getElementById(
+      "selectedPassPanel"
+    )
+    .scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+}
+
+function closeSelectedPass() {
+
+  selectedPass =
+    null;
+
+  document
+    .getElementById(
+      "selectedPassPanel"
+    )
+    .classList
+    .add("hidden");
+}
+
+function renderSelectedPass() {
+
+  const box =
+    document
+      .getElementById(
+        "selectedPassPanel"
+      );
+
+  if (!selectedPass) {
+
+    box
+      .classList
+      .add("hidden");
+
+    return;
+  }
+
+  const pass =
+    selectedPass;
+
+  const used =
+    usedTransactions(
+      pass.id
+    );
+
+  let dates =
+    "";
+
+  for (
+    let i = 1;
+    i <= totalUses(pass);
+    i++
+  ) {
+
+    const transaction =
+      used.find(
+        item =>
+          Number(
+            item.sequence_no
+          ) === i
+      );
+
+    dates += `
+      <div class="history-row">
+
+        <div class="history-title">
+
+          <span>
+            DATE.${i}
+            ${
+              i === 5
+                ? '<span class="gift">贈</span>'
+                : ""
+            }
+          </span>
+
+          <span>
+            ${
+              transaction
+                ?.service_date ||
+              "—"
+            }
+          </span>
+
+        </div>
+
+        ${
+          transaction
+            ? `
               <div class="muted">
-                ${escapeHtml(p.phone || "")}
+
+                ${esc(
+                  transaction
+                    .service_type ||
+                  ""
+                )}
+
+                ・補差
+                $
+                ${money(
+                  transaction
+                    .extra_amount
+                )}
+
+                ・
 
                 ${
-                  p.breed
-                    ? "・" +
-                      escapeHtml(p.breed)
-                    : ""
+                  transaction.signature
+                    ? '<span class="signed">已簽名</span>'
+                    : '<span class="unsigned">未簽名</span>'
                 }
-              </div>
 
-              <div style="margin-top:8px">
-                <strong>
-                  剩餘 ${remaining} / 5 次
-                </strong>
+              </div>
+            `
+            : `
+              <div class="muted">
+                尚未使用
+              </div>
+            `
+        }
+
+      </div>
+    `;
+  }
+
+  box.className =
+    "";
+
+  box.innerHTML = `
+
+    <div class="card">
+
+      <div class="top-actions">
+
+        <button
+          class="btn small secondary"
+          type="button"
+          onclick="closeSelectedPass()"
+        >
+          收起
+        </button>
+
+      </div>
+
+      <div class="paper">
+
+        <h2 style="text-align:center">
+          買4送1計次券
+        </h2>
+
+        <div class="paper-grid">
+
+          <div class="paper-row">
+            犬種：
+            ${esc(
+              pass.breed ||
+              "-"
+            )}
+          </div>
+
+          <div class="paper-row">
+            付款日：
+            ${
+              pass.payment_date ||
+              "-"
+            }
+          </div>
+
+          <div class="paper-row">
+            毛孩名字：
+            ${esc(
+              pass.pet_name ||
+              "-"
+            )}
+            ${
+              pass.shared_pet_name
+                ? " / " +
+                  esc(
+                    pass.shared_pet_name
+                  )
+                : ""
+            }
+          </div>
+
+          <div class="paper-row">
+            使用期限：
+            ${
+              pass.expiry_date ||
+              "-"
+            }
+          </div>
+
+          <div class="paper-row">
+            計次券金額：
+            $
+            ${money(
+              pass.pass_amount
+            )}
+          </div>
+
+          <div class="paper-row">
+            洗澡差額：
+            $
+            ${money(
+              pass.bath_extra_amount
+            )}
+          </div>
+
+          <div class="paper-row">
+            加購造型／金額：
+            ${esc(
+              pass.styling_addon ||
+              "-"
+            )}
+            /
+            $
+            ${money(
+              pass.styling_addon_amount
+            )}
+          </div>
+
+          <div class="paper-row">
+            大美差額：
+            $
+            ${money(
+              pass.groom_extra_amount
+            )}
+          </div>
+
+          <div class="paper-row">
+            計次券加購：
+            $
+            ${money(
+              pass.pass_addon_amount
+            )}
+          </div>
+
+          <div class="paper-row">
+            備註：
+            ${esc(
+              pass.notes ||
+              "-"
+            )}
+          </div>
+
+          <div class="paper-row">
+            SPA加購：
+            $
+            ${money(
+              pass.spa_addon_amount
+            )}
+          </div>
+
+          <div class="paper-row">
+            飼主：
+            ${esc(
+              pass.owner_name ||
+              "-"
+            )}
+            /
+            ${esc(
+              pass.phone ||
+              "-"
+            )}
+          </div>
+
+          <div class="paper-row">
+            總金額：
+            $
+            ${money(
+              pass.total_paid
+            )}
+          </div>
+
+          <div class="paper-row">
+            ${
+              pass.shared_pass
+                ? "共用券（25天）"
+                : "一般券（45天）"
+            }
+          </div>
+
+        </div>
+
+        <ul class="rules">
+
+          <li>
+            計次券期限45天，過期需補差額
+          </li>
+
+          <li>
+            剪毛指定頭尾修剪造型，只限一次
+          </li>
+
+          <li>
+            若無剪毛需求，贈一次洗澡
+          </li>
+
+          <li>
+            同價位毛孩券可共用，上限兩隻，期限25天
+          </li>
+
+          <li>
+            計次券金額會依毛孩毛長、體重、年紀調整
+          </li>
+
+        </ul>
+
+        <div style="margin-top:12px">
+
+          ${dates}
+
+        </div>
+
+      </div>
+
+      <div class="summary">
+
+        <div>
+          <span class="muted">
+            已使用
+          </span>
+
+          <b>
+            ${getUsedCount(
+              pass.id
+            )}
+          </b>
+        </div>
+
+        <div>
+          <span class="muted">
+            剩餘
+          </span>
+
+          <b>
+            ${getRemaining(
+              pass
+            )}
+          </b>
+        </div>
+
+        <div>
+          <span class="muted">
+            狀態
+          </span>
+
+          <b style="font-size:14px">
+            ${statusText(
+              getPassStatus(
+                pass
+              )
+            )}
+          </b>
+        </div>
+
+      </div>
+
+      <button
+        class="btn"
+        type="button"
+        onclick="openUsage(true)"
+      >
+        本次折抵＋簽名
+      </button>
+
+      <button
+        class="btn secondary"
+        type="button"
+        onclick="openUsage(false)"
+      >
+        本次有消費，但不折抵
+      </button>
+
+    </div>
+  `;
+}
+
+
+/* =========================
+   自動到期
+========================= */
+
+function autoExpiry() {
+
+  const payment =
+    document
+      .getElementById(
+        "paymentDate"
+      )
+      .value;
+
+  const shared =
+    document
+      .getElementById(
+        "sharedPass"
+      )
+      .checked;
+
+  document
+    .getElementById(
+      "expiryDate"
+    )
+    .value =
+    addDays(
+      payment,
+      shared
+        ? 25
+        : 45
+    );
+}
+
+
+/* =========================
+   建立計次券
+========================= */
+
+async function createPass() {
+
+  const owner =
+    document
+      .getElementById(
+        "ownerName"
+      )
+      .value
+      .trim();
+
+  const pet =
+    document
+      .getElementById(
+        "petName"
+      )
+      .value
+      .trim();
+
+  if (
+    !owner ||
+    !pet
+  ) {
+
+    alert(
+      "請填飼主姓名與毛孩名字"
+    );
+
+    return;
+  }
+
+  const row = {
+
+    owner_name:
+      owner,
+
+    phone:
+      document
+        .getElementById(
+          "phone"
+        )
+        .value
+        .trim(),
+
+    pet_name:
+      pet,
+
+    breed:
+      document
+        .getElementById(
+          "breed"
+        )
+        .value
+        .trim(),
+
+    pass_amount:
+      num(
+        "passAmount"
+      ),
+
+    styling_addon:
+      document
+        .getElementById(
+          "stylingAddon"
+        )
+        .value
+        .trim(),
+
+    styling_addon_amount:
+      num(
+        "stylingAddonAmount"
+      ),
+
+    pass_addon_amount:
+      num(
+        "passAddonAmount"
+      ),
+
+    spa_addon_amount:
+      num(
+        "spaAddonAmount"
+      ),
+
+    total_paid:
+      num(
+        "totalPaid"
+      ),
+
+    payment_date:
+      document
+        .getElementById(
+          "paymentDate"
+        )
+        .value ||
+      null,
+
+    expiry_date:
+      document
+        .getElementById(
+          "expiryDate"
+        )
+        .value ||
+      null,
+
+    bath_extra_amount:
+      num(
+        "bathExtraAmount"
+      ),
+
+    groom_extra_amount:
+      num(
+        "groomExtraAmount"
+      ),
+
+    shared_pass:
+      document
+        .getElementById(
+          "sharedPass"
+        )
+        .checked,
+
+    shared_pet_name:
+      document
+        .getElementById(
+          "sharedPetName"
+        )
+        .value
+        .trim(),
+
+    total_uses:
+      5,
+
+    notes:
+      document
+        .getElementById(
+          "passNotes"
+        )
+        .value
+        .trim(),
+
+    status:
+      "active"
+  };
+
+  const {
+    error
+  } =
+    await client
+      .from("passes")
+      .insert(row);
+
+  if (error) {
+
+    alert(
+      "建立失敗：" +
+      error.message
+    );
+
+    return;
+  }
+
+  alert(
+    "建立成功"
+  );
+
+  [
+    "ownerName",
+    "phone",
+    "petName",
+    "breed",
+    "passAmount",
+    "stylingAddon",
+    "stylingAddonAmount",
+    "passAddonAmount",
+    "spaAddonAmount",
+    "totalPaid",
+    "bathExtraAmount",
+    "groomExtraAmount",
+    "sharedPetName",
+    "passNotes"
+  ]
+    .forEach(
+      id => {
+
+        document
+          .getElementById(id)
+          .value =
+          "";
+      }
+    );
+
+  document
+    .getElementById(
+      "sharedPass"
+    )
+    .checked =
+    false;
+
+  document
+    .getElementById(
+      "paymentDate"
+    )
+    .value =
+    today();
+
+  autoExpiry();
+
+  await refreshData();
+
+  showPage(
+    "search",
+    document
+      .querySelectorAll(
+        ".tab"
+      )[0]
+  );
+}
+
+
+/* =========================
+   開啟簽名
+========================= */
+
+function openUsage(
+  redeemed
+) {
+
+  if (!selectedPass) {
+    return;
+  }
+
+  if (
+    redeemed &&
+    getRemaining(
+      selectedPass
+    ) <= 0
+  ) {
+
+    alert(
+      "此計次券已用完"
+    );
+
+    return;
+  }
+
+  document
+    .getElementById(
+      "usageModal"
+    )
+    .classList
+    .remove("hidden");
+
+  document
+    .getElementById(
+      "redeemedSelect"
+    )
+    .value =
+    redeemed
+      ? "true"
+      : "false";
+
+  document
+    .getElementById(
+      "serviceDate"
+    )
+    .value =
+    today();
+
+  document
+    .getElementById(
+      "serviceType"
+    )
+    .value =
+    "洗澡";
+
+  document
+    .getElementById(
+      "originalPrice"
+    )
+    .value =
+    "";
+
+  document
+    .getElementById(
+      "redeemAmount"
+    )
+    .value =
+    "";
+
+  document
+    .getElementById(
+      "operatorName"
+    )
+    .value =
+    "";
+
+  document
+    .getElementById(
+      "usageNotes"
+    )
+    .value =
+    "";
+
+  document
+    .getElementById(
+      "usagePassInfo"
+    )
+    .innerHTML = `
+
+      <b>
+        ${esc(
+          selectedPass
+            .pet_name
+        )}
+      </b>
+
+      ｜
+
+      ${esc(
+        selectedPass
+          .owner_name
+      )}
+
+      ｜剩餘
+
+      ${getRemaining(
+        selectedPass
+      )}
+
+      /
+
+      ${totalUses(
+        selectedPass
+      )}
+
+      次
+
+      ｜到期
+
+      ${
+        selectedPass
+          .expiry_date ||
+        "-"
+      }
+    `;
+
+  clearSignature();
+
+  updateUsageMode();
+
+  setTimeout(
+    setupSignature,
+    50
+  );
+}
+
+function closeUsage() {
+
+  document
+    .getElementById(
+      "usageModal"
+    )
+    .classList
+    .add("hidden");
+
+  clearSignature();
+}
+
+
+/* =========================
+   補差額
+========================= */
+
+function updateUsageMode() {
+
+  const redeemed =
+    document
+      .getElementById(
+        "redeemedSelect"
+      )
+      .value ===
+    "true";
+
+  const redeemInput =
+    document
+      .getElementById(
+        "redeemAmount"
+      );
+
+  redeemInput.disabled =
+    !redeemed;
+
+  if (!redeemed) {
+
+    redeemInput.value =
+      0;
+  }
+
+  autoExtraAmount();
+}
+
+function autoExtraAmount() {
+
+  if (!selectedPass) {
+    return;
+  }
+
+  const type =
+    document
+      .getElementById(
+        "serviceType"
+      )
+      .value;
+
+  let value =
+    0;
+
+  if (
+    type ===
+    "洗澡"
+  ) {
+
+    value =
+      Number(
+        selectedPass
+          .bath_extra_amount ||
+        0
+      );
+  }
+
+  if (
+    type ===
+    "大美"
+  ) {
+
+    value =
+      Number(
+        selectedPass
+          .groom_extra_amount ||
+        0
+      );
+  }
+
+  document
+    .getElementById(
+      "extraAmount"
+    )
+    .value =
+    value;
+}
+
+
+/* =========================
+   儲存本次消費
+========================= */
+
+async function saveUsage() {
+
+  const redeemed =
+    document
+      .getElementById(
+        "redeemedSelect"
+      )
+      .value ===
+    "true";
+
+  if (
+    redeemed &&
+    getRemaining(
+      selectedPass
+    ) <= 0
+  ) {
+
+    alert(
+      "此計次券已無剩餘次數"
+    );
+
+    return;
+  }
+
+  if (!signatureHasInk) {
+
+    alert(
+      "請先請顧客簽名"
+    );
+
+    return;
+  }
+
+  const canvas =
+    document
+      .getElementById(
+        "signatureCanvas"
+      );
+
+  const row = {
+
+    pass_id:
+      selectedPass.id,
+
+    sequence_no:
+      redeemed
+        ? getUsedCount(
+            selectedPass.id
+          ) + 1
+        : 0,
+
+    service_date:
+      document
+        .getElementById(
+          "serviceDate"
+        )
+        .value ||
+      today(),
+
+    service_type:
+      document
+        .getElementById(
+          "serviceType"
+        )
+        .value,
+
+    original_price:
+      num(
+        "originalPrice"
+      ),
+
+    redeem_amount:
+      redeemed
+        ? num(
+            "redeemAmount"
+          )
+        : 0,
+
+    extra_amount:
+      num(
+        "extraAmount"
+      ),
+
+    notes:
+      document
+        .getElementById(
+          "usageNotes"
+        )
+        .value
+        .trim(),
+
+    signature:
+      canvas
+        .toDataURL(
+          "image/png"
+        ),
+
+    operator_name:
+      document
+        .getElementById(
+          "operatorName"
+        )
+        .value
+        .trim(),
+
+    voided:
+      false,
+
+    redeemed:
+      redeemed,
+
+    signed_at:
+      new Date()
+        .toISOString()
+  };
+
+  const {
+    error
+  } =
+    await client
+      .from(
+        "transactions"
+      )
+      .insert(row);
+
+  if (error) {
+
+    alert(
+      "儲存失敗：" +
+      error.message
+    );
+
+    return;
+  }
+
+  alert(
+    redeemed
+      ? "已完成扣次與簽名"
+      : "已保存本次未折抵消費與簽名"
+  );
+
+  closeUsage();
+
+  await refreshData();
+}
+
+
+/* =========================
+   紀錄
+========================= */
+
+function setRecordFilter(
+  filter,
+  button
+) {
+
+  recordFilter =
+    filter;
+
+  button
+    .parentElement
+    .querySelectorAll(
+      ".chip"
+    )
+    .forEach(
+      element => {
+
+        element
+          .classList
+          .remove(
+            "active"
+          );
+      }
+    );
+
+  button
+    .classList
+    .add("active");
+
+  renderRecords();
+}
+
+function renderRecords() {
+
+  const dateInput =
+    document
+      .getElementById(
+        "recordDate"
+      );
+
+  if (!dateInput) {
+    return;
+  }
+
+  const date =
+    dateInput.value ||
+    today();
+
+  const keyword =
+    document
+      .getElementById(
+        "recordSearch"
+      )
+      .value
+      .trim()
+      .toLowerCase();
+
+  let list =
+    transactions
+      .filter(
+        transaction =>
+          !transaction.voided &&
+          transaction
+            .service_date ===
+          date
+      );
+
+  list =
+    list.filter(
+      transaction => {
+
+        const pass =
+          passes.find(
+            p =>
+              p.id ===
+              transaction
+                .pass_id
+          );
+
+        const text = [
+          pass?.pet_name,
+          pass?.owner_name,
+          pass?.phone,
+          transaction.service_type,
+          transaction.operator_name
+        ]
+          .join(" ")
+          .toLowerCase();
+
+        if (
+          keyword &&
+          !text.includes(
+            keyword
+          )
+        ) {
+
+          return false;
+        }
+
+        if (
+          recordFilter ===
+          "redeemed"
+        ) {
+
+          return (
+            transaction
+              .redeemed !==
+            false
+          );
+        }
+
+        if (
+          recordFilter ===
+          "notRedeemed"
+        ) {
+
+          return (
+            transaction
+              .redeemed ===
+            false
+          );
+        }
+
+        if (
+          recordFilter ===
+          "signed"
+        ) {
+
+          return !!transaction
+            .signature;
+        }
+
+        if (
+          recordFilter ===
+          "unsigned"
+        ) {
+
+          return !transaction
+            .signature;
+        }
+
+        return true;
+      }
+    );
+
+  const box =
+    document
+      .getElementById(
+        "recordsList"
+      );
+
+  const summary =
+    document
+      .getElementById(
+        "recordSummary"
+      );
+
+  const dayAll =
+    transactions
+      .filter(
+        transaction =>
+          !transaction.voided &&
+          transaction
+            .service_date ===
+          date
+      );
+
+  const signed =
+    dayAll
+      .filter(
+        transaction =>
+          !!transaction
+            .signature
+      )
+      .length;
+
+  const noRedeem =
+    dayAll
+      .filter(
+        transaction =>
+          transaction
+            .redeemed ===
+          false
+      )
+      .length;
+
+  summary.textContent =
+    `${date}｜共 ${dayAll.length} 筆｜已簽 ${signed}｜未簽 ${dayAll.length - signed}｜未折抵 ${noRedeem}`;
+
+  if (!list.length) {
+
+    box.innerHTML =
+      '<div class="muted">這個條件沒有紀錄</div>';
+
+    return;
+  }
+
+  box.innerHTML =
+    list
+      .map(
+        transaction => {
+
+          const pass =
+            passes.find(
+              p =>
+                p.id ===
+                transaction
+                  .pass_id
+            );
+
+          return `
+            <div class="record-row">
+
+              <div class="record-head">
+
+                <div>
+
+                  <b>
+                    ${esc(
+                      pass?.pet_name ||
+                      "未知毛孩"
+                    )}
+                  </b>
+
+                  ・
+
+                  ${esc(
+                    pass?.owner_name ||
+                    ""
+                  )}
+
+                </div>
+
+                <div>
+
+                  ${
+                    transaction.signature
+                      ? '<span class="signed">已簽名</span>'
+                      : '<span class="unsigned">未簽名</span>'
+                  }
+
+                </div>
+
               </div>
 
               <div class="muted">
-                付款：
-                ${p.payment_date || "-"}
-                ｜到期：
-                ${p.expiry_date || "-"}
+
+                ${
+                  transaction.redeemed ===
+                  false
+                    ? "未折抵"
+                    : "第 " +
+                      (
+                        transaction.sequence_no ||
+                        "-"
+                      ) +
+                      " 次折抵"
+                }
+
+                ｜
+
+                ${esc(
+                  transaction
+                    .service_type ||
+                  ""
+                )}
+
+                ｜補差
+                $
+                ${money(
+                  transaction
+                    .extra_amount
+                )}
+
+                ｜經手
+                ${esc(
+                  transaction
+                    .operator_name ||
+                  "-"
+                )}
+
               </div>
 
               ${
-                p.notes
+                transaction.notes
                   ? `
                     <div class="muted">
                       備註：
-                      ${escapeHtml(p.notes)}
+                      ${esc(
+                        transaction.notes
+                      )}
                     </div>
                   `
                   : ""
@@ -1302,559 +3087,286 @@
 
             </div>
           `;
-        }).join("");
-    }
+        }
+      )
+      .join("");
+}
 
-    /*
-      ==================================================
-      使用計次券
-      ==================================================
-    */
 
-    function renderUsageOptions() {
-      const select =
-        document.getElementById(
-          "usagePass"
-        );
+/* =========================
+   頁面切換
+========================= */
 
-      const active =
-        passes.filter(
-          p => getStatus(p) === "active"
-        );
+function showPage(
+  name,
+  button
+) {
 
-      select.innerHTML =
-        `<option value="">請選擇</option>` +
+  [
+    "search",
+    "create",
+    "records"
+  ]
+    .forEach(
+      pageName => {
 
-        active.map(p => `
-          <option value="${p.id}">
-            ${escapeHtml(
-              p.pet_name || ""
-            )}
-            ｜${escapeHtml(
-              p.owner_name || ""
-            )}
-            ｜剩 ${getRemaining(p.id)} 次
-          </option>
-        `).join("");
-
-      select.onchange =
-        showSelectedPass;
-    }
-
-    function showSelectedPass() {
-      const id =
         document
-          .getElementById("usagePass")
-          .value;
-
-      const box =
-        document.getElementById(
-          "selectedPassInfo"
-        );
-
-      const pass =
-        passes.find(p => p.id === id);
-
-      if (!pass) {
-        box.classList.add("hidden");
-        return;
+          .getElementById(
+            pageName +
+            "Page"
+          )
+          .classList
+          .toggle(
+            "hidden",
+            pageName !==
+            name
+          );
       }
-
-      box.classList.remove("hidden");
-
-      box.innerHTML = `
-        <strong>
-          ${escapeHtml(
-            pass.pet_name || ""
-          )}
-        </strong>
-
-        ｜${escapeHtml(
-          pass.owner_name || ""
-        )}
-
-        <br>
-
-        剩餘：
-        ${getRemaining(pass.id)} / 5 次
-
-        <br>
-
-        洗澡原價：
-        $${pass.bath_price || 0}
-
-        ｜美容原價：
-        $${pass.groom_price || 0}
-      `;
-    }
-
-    async function createUsage() {
-      const passId =
-        document
-          .getElementById("usagePass")
-          .value;
-
-      if (!passId) {
-        alert(
-          "請先選擇計次券"
-        );
-        return;
-      }
-
-      if (getRemaining(passId) <= 0) {
-        alert(
-          "此計次券已無剩餘次數"
-        );
-        return;
-      }
-
-      if (!signatureHasInk) {
-        alert(
-          "請先請顧客完成簽名"
-        );
-        return;
-      }
-
-      const canvas =
-        document.getElementById(
-          "signatureCanvas"
-        );
-
-      const signature =
-        canvas.toDataURL("image/png");
-
-      const row = {
-        pass_id: passId,
-
-        sequence_no:
-          getUsedCount(passId) + 1,
-
-        service_date:
-          document
-            .getElementById("serviceDate")
-            .value,
-
-        service_type:
-          document
-            .getElementById("serviceType")
-            .value,
-
-        original_price:
-          numberOrZero(
-            "originalPrice"
-          ),
-
-        redeem_amount:
-          numberOrZero(
-            "redeemAmount"
-          ),
-
-        extra_amount:
-          numberOrZero(
-            "extraAmount"
-          ),
-
-        notes:
-          document
-            .getElementById("usageNotes")
-            .value
-            .trim(),
-
-        signature,
-
-        operator_name:
-          document
-            .getElementById("operatorName")
-            .value
-            .trim(),
-
-        voided: false
-      };
-
-      const {
-        error
-      } = await client
-        .from("transactions")
-        .insert(row);
-
-      if (error) {
-        alert(
-          "扣次失敗：" +
-          error.message
-        );
-        return;
-      }
-
-      alert(
-        "使用紀錄已完成並保存"
-      );
-
-      clearSignature();
-
-      document.getElementById(
-        "usageNotes"
-      ).value = "";
-
-      document.getElementById(
-        "originalPrice"
-      ).value = "";
-
-      document.getElementById(
-        "redeemAmount"
-      ).value = "";
-
-      document.getElementById(
-        "extraAmount"
-      ).value = "0";
-
-      await refreshData();
-    }
-
-    /*
-      ==================================================
-      使用紀錄
-      ==================================================
-    */
-
-    function renderTransactions() {
-      const box =
-        document.getElementById(
-          "transactionsList"
-        );
-
-      if (!transactions.length) {
-        box.innerHTML =
-          `<div class="muted">目前沒有使用紀錄</div>`;
-        return;
-      }
-
-      box.innerHTML =
-        transactions
-          .slice(0, 30)
-          .map(t => {
-            const pass =
-              passes.find(
-                p => p.id === t.pass_id
-              );
-
-            return `
-              <div class="pass">
-
-                <strong>
-                  ${escapeHtml(
-                    pass?.pet_name ||
-                    "未知寵物"
-                  )}
-                </strong>
-
-                <span class="muted">
-                  ・第
-                  ${t.sequence_no || "-"}
-                  次
-                </span>
-
-                <div class="muted">
-                  ${t.service_date || ""}
-                  ｜${escapeHtml(
-                    t.service_type || ""
-                  )}
-                  ｜經手：
-                  ${escapeHtml(
-                    t.operator_name || "-"
-                  )}
-                </div>
-
-                <div class="muted">
-                  原價
-                  $${t.original_price || 0}
-
-                  ｜扣抵
-                  $${t.redeem_amount || 0}
-
-                  ｜補差
-                  $${t.extra_amount || 0}
-                </div>
-
-                ${
-                  t.voided
-                    ? `
-                      <div class="badge expired">
-                        已作廢
-                      </div>
-                    `
-                    : ""
-                }
-
-              </div>
-            `;
-          })
-          .join("");
-    }
-
-    /*
-      ==================================================
-      設定
-      ==================================================
-    */
-
-    async function loadSettings() {
-      const {
-        data,
-        error
-      } = await client
-        .from("settings")
-        .select("*")
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.error(
-          "讀取設定失敗：",
-          error
-        );
-        return;
-      }
-
-      if (!data) return;
-
-      document.getElementById(
-        "normalExpiryDays"
-      ).value =
-        data.normal_expiry_days ?? "";
-
-      document.getElementById(
-        "sharedExpiryDays"
-      ).value =
-        data.shared_expiry_days ?? "";
-
-      document.getElementById(
-        "retentionMonths"
-      ).value =
-        data.retention_months ?? "";
-    }
-
-    async function saveSettings() {
-      const {
-        data: existing,
-        error: lookupError
-      } = await client
-        .from("settings")
-        .select("id")
-        .limit(1)
-        .maybeSingle();
-
-      if (lookupError) {
-        alert(
-          "設定讀取失敗：" +
-          lookupError.message
-        );
-        return;
-      }
-
-      const values = {
-        normal_expiry_days:
-          parseInt(
-            document
-              .getElementById(
-                "normalExpiryDays"
-              )
-              .value || "0"
-          ),
-
-        shared_expiry_days:
-          parseInt(
-            document
-              .getElementById(
-                "sharedExpiryDays"
-              )
-              .value || "0"
-          ),
-
-        retention_months:
-          parseInt(
-            document
-              .getElementById(
-                "retentionMonths"
-              )
-              .value || "3"
-          ),
-
-        updated_at:
-          new Date().toISOString()
-      };
-
-      let result;
-
-      if (existing?.id) {
-        result =
-          await client
-            .from("settings")
-            .update(values)
-            .eq(
-              "id",
-              existing.id
-            );
-      } else {
-        result =
-          await client
-            .from("settings")
-            .insert({
-              id: 1,
-              ...values
-            });
-      }
-
-      if (result.error) {
-        alert(
-          "儲存失敗：" +
-          result.error.message
-        );
-        return;
-      }
-
-      alert(
-        "設定已儲存"
-      );
-    }
-
-    /*
-      ==================================================
-      簽名
-      ==================================================
-    */
-
-    function setupSignature() {
-      const canvas =
-        document.getElementById(
-          "signatureCanvas"
-        );
-
-      if (!canvas) return;
-
-      const rect =
-        canvas.getBoundingClientRect();
-
-      if (!rect.width) return;
-
-      const ratio =
-        window.devicePixelRatio || 1;
-
-      canvas.width =
-        rect.width * ratio;
-
-      canvas.height =
-        180 * ratio;
-
-      const ctx =
-        canvas.getContext("2d");
-
-      ctx.setTransform(
-        ratio,
-        0,
-        0,
-        ratio,
-        0,
-        0
-      );
-
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.strokeStyle = "#111";
-
-      function point(e) {
-        const r =
-          canvas.getBoundingClientRect();
-
-        const touch =
-          e.touches
-            ? e.touches[0]
-            : e;
-
-        return {
-          x:
-            touch.clientX -
-            r.left,
-
-          y:
-            touch.clientY -
-            r.top
-        };
-      }
-
-      function start(e) {
-        e.preventDefault();
-
-        drawing = true;
-        signatureHasInk = true;
-
-        const p = point(e);
-
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-      }
-
-      function move(e) {
-        if (!drawing) return;
-
-        e.preventDefault();
-
-        const p = point(e);
-
-        ctx.lineTo(
-          p.x,
-          p.y
-        );
-
-        ctx.stroke();
-      }
-
-      function end() {
-        drawing = false;
-      }
-
-      canvas.onpointerdown = start;
-      canvas.onpointermove = move;
-      canvas.onpointerup = end;
-      canvas.onpointerleave = end;
-
-      canvas.ontouchstart = start;
-      canvas.ontouchmove = move;
-      canvas.ontouchend = end;
-    }
-
-    function clearSignature() {
-      const canvas =
-        document.getElementById(
-          "signatureCanvas"
-        );
-
-      if (!canvas) return;
-
-      const ctx =
-        canvas.getContext("2d");
-
-      ctx.clearRect(
-        0,
-        0,
-        canvas.width,
-        canvas.height
-      );
-
-      signatureHasInk = false;
-    }
-
-    /*
-      ==================================================
-      啟動
-      ==================================================
-    */
-
-    window.addEventListener(
-      "DOMContentLoaded",
-      initializeApp
     );
-  </script>
+
+  document
+    .querySelectorAll(
+      ".tab"
+    )
+    .forEach(
+      element => {
+
+        element
+          .classList
+          .remove("active");
+      }
+    );
+
+  button
+    .classList
+    .add("active");
+
+  if (
+    name ===
+    "records"
+  ) {
+
+    renderRecords();
+  }
+}
+
+
+/* =========================
+   簽名
+========================= */
+
+function setupSignature() {
+
+  const canvas =
+    document
+      .getElementById(
+        "signatureCanvas"
+      );
+
+  if (!canvas) {
+    return;
+  }
+
+  const rect =
+    canvas
+      .getBoundingClientRect();
+
+  if (!rect.width) {
+    return;
+  }
+
+  const ratio =
+    window.devicePixelRatio ||
+    1;
+
+  canvas.width =
+    rect.width *
+    ratio;
+
+  canvas.height =
+    320 *
+    ratio;
+
+  const context =
+    canvas
+      .getContext("2d");
+
+  context.setTransform(
+    ratio,
+    0,
+    0,
+    ratio,
+    0,
+    0
+  );
+
+  context.lineWidth =
+    3;
+
+  context.lineCap =
+    "round";
+
+  context.lineJoin =
+    "round";
+
+  context.strokeStyle =
+    "#111";
+
+  function point(event) {
+
+    const canvasRect =
+      canvas
+        .getBoundingClientRect();
+
+    const source =
+      event.touches
+        ? event.touches[0]
+        : event;
+
+    return {
+
+      x:
+        source.clientX -
+        canvasRect.left,
+
+      y:
+        source.clientY -
+        canvasRect.top
+    };
+  }
+
+  function start(event) {
+
+    event.preventDefault();
+
+    drawing =
+      true;
+
+    signatureHasInk =
+      true;
+
+    const state =
+      document
+        .getElementById(
+          "signatureState"
+        );
+
+    state.textContent =
+      "已簽名";
+
+    state.className =
+      "signed";
+
+    const p =
+      point(event);
+
+    context.beginPath();
+
+    context.moveTo(
+      p.x,
+      p.y
+    );
+  }
+
+  function move(event) {
+
+    if (!drawing) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const p =
+      point(event);
+
+    context.lineTo(
+      p.x,
+      p.y
+    );
+
+    context.stroke();
+  }
+
+  function end() {
+
+    drawing =
+      false;
+  }
+
+  canvas.onpointerdown =
+    start;
+
+  canvas.onpointermove =
+    move;
+
+  canvas.onpointerup =
+    end;
+
+  canvas.onpointerleave =
+    end;
+
+  canvas.ontouchstart =
+    start;
+
+  canvas.ontouchmove =
+    move;
+
+  canvas.ontouchend =
+    end;
+}
+
+function clearSignature() {
+
+  const canvas =
+    document
+      .getElementById(
+        "signatureCanvas"
+      );
+
+  if (canvas) {
+
+    const context =
+      canvas
+        .getContext("2d");
+
+    context.clearRect(
+      0,
+      0,
+      canvas.width,
+      canvas.height
+    );
+  }
+
+  signatureHasInk =
+    false;
+
+  const state =
+    document
+      .getElementById(
+        "signatureState"
+      );
+
+  if (state) {
+
+    state.textContent =
+      "尚未簽名";
+
+    state.className =
+      "muted";
+  }
+}
+
+
+/* =========================
+   啟動
+========================= */
+
+window.addEventListener(
+  "DOMContentLoaded",
+  init
+);
+
+</script>
 
 </body>
 </html>
