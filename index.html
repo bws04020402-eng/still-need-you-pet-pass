@@ -3024,11 +3024,11 @@ function renderRecords() {
 
                 <div>
 
-                  ${
-                    transaction.signature
-                      ? '<span class="signed">已簽名</span>'
-                      : '<span class="unsigned">未簽名</span>'
-                  }
+${
+  transaction.signature
+    ? '<span class="signed">已簽名</span>　<a href="' + transaction.signature + '" target="_blank" rel="noopener">查看簽名</a>'
+    : '<span class="unsigned">未簽名</span>'
+}
 
                 </div>
 
