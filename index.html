@@ -461,7 +461,14 @@
     >
       登入系統
     </button>
-
+<button
+  id="signupButton"
+  class="btn secondary"
+  type="button"
+  onclick="signup()"
+>
+  註冊新帳號
+</button>
     <p id="loginMessage" class="muted"></p>
 
   </div>
@@ -1262,7 +1269,59 @@ async function login() {
     data.user
   );
 }
+async function signup() {
+  const email = document
+    .getElementById("loginEmail")
+    .value
+    .trim();
 
+  const password = document
+    .getElementById("loginPassword")
+    .value;
+
+  const message = document.getElementById("loginMessage");
+  const button = document.getElementById("signupButton");
+
+  if (!email || !password) {
+    message.textContent = "請輸入 Email 與密碼";
+    message.className = "error";
+    return;
+  }
+
+  if (password.length < 6) {
+    message.textContent = "密碼至少需要 6 個字元";
+    message.className = "error";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "註冊中...";
+
+  const { data, error } = await client.auth.signUp({
+    email,
+    password
+  });
+
+  button.disabled = false;
+  button.textContent = "註冊新帳號";
+
+  if (error) {
+    message.textContent = "註冊失敗：" + error.message;
+    message.className = "error";
+    return;
+  }
+
+  if (data && data.session) {
+    message.textContent = "註冊成功，正在登入...";
+    message.className = "muted";
+    await openApp(data.user);
+    return;
+  }
+
+  message.textContent =
+    "註冊成功！請到 Email 收驗證信，驗證完成後再回來登入。";
+  message.className = "muted";
+}
 async function logout() {
 
   await client
