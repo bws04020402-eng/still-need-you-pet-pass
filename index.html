@@ -1900,7 +1900,13 @@ function renderSelectedPass() {
     <div class="card">
 
       <div class="top-actions">
-
+<button
+  class="btn small"
+  type="button"
+  onclick="editSelectedPass()"
+>
+  修改計次券
+</button>
         <button
           class="btn small secondary"
           type="button"
@@ -2422,7 +2428,9 @@ async function createPass() {
       )[0]
   );
 }
-
+/* ========================
+   開啟簽名
+======================== */
 
 /* =========================
    開啟簽名
