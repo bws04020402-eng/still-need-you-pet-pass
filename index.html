@@ -733,7 +733,7 @@
             <label>服務項目</label>
             <select id="serviceType" onchange="autoExtraAmount()">
               <option value="洗澡">洗澡</option>
-              <option value="大美">大美容（折抵2次，取消贈次）</option>
+              <option value="大美">大美容（折抵1次，取消贈次）</option>
               <option value="SPA">SPA</option>
               <option value="其他">其他</option>
             </select>
@@ -1127,16 +1127,16 @@ function usedTransactions(passId) {
 }
 
 // Persist the new rule in the existing notes field; historical records retain their original accounting.
-const GROOM_RULE = "【大美容折抵2次，取消贈次】";
-function isDoubleGroom(transaction) {
+const GROOM_RULE = "【大美容折抵1次，取消贈次】";
+function isGroomRedemption(transaction) {
   return transaction.service_type === "大美" && transaction.redeemed !== false &&
-    String(transaction.notes || "").startsWith(GROOM_RULE);
+    [GROOM_RULE, "【大美容折抵2次，取消贈次】"].some(rule => String(transaction.notes || "").startsWith(rule));
 }
 function usageUnits(transaction) {
-  return isDoubleGroom(transaction) ? 2 : 1;
+  return 1;
 }
 function giftCancelled(passId) {
-  return usedTransactions(passId).some(isDoubleGroom);
+  return usedTransactions(passId).some(isGroomRedemption);
 }
 function getUsedCount(passId) {
   return usedTransactions(passId).reduce((sum, t) => sum + usageUnits(t), 0);
@@ -1387,7 +1387,6 @@ function renderSelectedPass() {
     i++
   ) {
     const transaction = historySlots[i - 1];
-    const secondGroomUnit = transaction && i > 1 && historySlots[i - 2] === transaction;
 
     dates += `
       <div class="history-row">
@@ -1411,7 +1410,7 @@ function renderSelectedPass() {
           transaction
             ? `
               <div class="muted">
-                ${secondGroomUnit ? "同筆大美容第2次折抵（共用一次簽名）" : esc(transaction.service_type || "") + "・補差 $" + money(transaction.extra_amount)}
+                ${esc(transaction.service_type || "")}・補差 $${money(transaction.extra_amount)}
                 ・
                 ${
                   transaction.signature
@@ -1583,7 +1582,7 @@ function renderSelectedPass() {
         <ul class="rules">
           <li>計次券期限45天，過期需補差額</li>
           <li>剪毛指定頭尾修剪造型，只限一次</li>
-          <li>若無剪毛需求，贈一次洗澡；新登錄大美容折抵2次並取消贈次</li>
+          <li>若無剪毛需求，贈一次洗澡；新登錄大美容折抵1次並取消贈次</li>
           ${giftCancelled(pass.id) ? "<li><b>此券已使用大美容，贈送洗澡已取消</b></li>" : ""}
           <li>同價位毛孩券可共用，上限兩隻，期限25天</li>
           <li>計次券金額會依毛孩毛長、體重、年紀調整</li>
@@ -2293,7 +2292,7 @@ function autoExtraAmount() {
   const redeemed = document.getElementById("redeemedSelect").value === "true";
   document.getElementById("groomUsageHint").textContent = editingTransactionId
     ? "重簽保留原紀錄的扣次規則"
-    : groom && redeemed ? "顧客簽名一次，折抵2次；此券贈送的一次將取消。" : "本次" + (redeemed ? "折抵1次" : "不折抵，不取消贈次");
+    : groom && redeemed ? "顧客簽名一次，折抵1次；此券贈送的一次將取消。" : "本次" + (redeemed ? "折抵1次" : "不折抵，不取消贈次");
 
   const type =
     document.getElementById(
@@ -2382,14 +2381,14 @@ async function persistUsage() {
 
   const redeemed = document.getElementById("redeemedSelect").value === "true";
 
-  const doubleGroom = redeemed && document.getElementById("serviceType").value === "大美";
+  const groomRedemption = redeemed && document.getElementById("serviceType").value === "大美";
   if (redeemed) {
     const latestUsage = await client.from("transactions").select("*").eq("pass_id", passId);
     if (latestUsage.error) return alert("無法確認剩餘次數：" + latestUsage.error.message);
     transactions = transactions.filter(t => t.pass_id !== passId).concat(latestUsage.data || []);
-    const available = (doubleGroom ? Math.max(0, Number(selectedPass.total_uses || 5) - 1) : totalUses(selectedPass)) - getUsedCount(passId);
-    if (available < (doubleGroom ? 2 : 1)) {
-      alert(doubleGroom ? "取消贈次後不足2次，無法折抵大美容；請選擇本次不折抵。" : "此計次券已無剩餘次數");
+    const available = (groomRedemption ? Math.max(0, Number(selectedPass.total_uses || 5) - 1) : totalUses(selectedPass)) - getUsedCount(passId);
+    if (available < 1) {
+      alert(groomRedemption ? "取消贈次後不足1次，無法折抵大美容；請選擇本次不折抵。" : "此計次券已無剩餘次數");
       return;
     }
   }
@@ -2408,7 +2407,7 @@ async function persistUsage() {
     original_price: num("originalPrice"),
     redeem_amount: redeemed ? num("redeemAmount") : 0,
     extra_amount: num("extraAmount"),
-    notes: (doubleGroom ? GROOM_RULE + "\n" : "") + document.getElementById("usageNotes").value.trim().replaceAll(GROOM_RULE, ""),
+    notes: (groomRedemption ? GROOM_RULE + "\n" : "") + document.getElementById("usageNotes").value.trim().replaceAll(GROOM_RULE, ""),
     signature: canvas.toDataURL("image/png"),
     operator_name: document.getElementById("operatorName").value.trim(),
     voided: false,
@@ -2423,7 +2422,7 @@ async function persistUsage() {
     return;
   }
 
-  alert(doubleGroom ? "已簽名並折抵2次，贈送一次已取消" : redeemed ? "已完成扣次與簽名" : "已保存本次未折抵消費與簽名");
+  alert(groomRedemption ? "已簽名並折抵1次，贈送一次已取消" : redeemed ? "已完成扣次與簽名" : "已保存本次未折抵消費與簽名");
   usageSaving = false;
   closeUsage();
   await refreshData();
@@ -2519,7 +2518,7 @@ function renderRecords() {
           ｜經手 ${esc(transaction.operator_name || "-")}
         </div>
 
-        ${transaction.notes ? `<div class="muted">備註：${esc(transaction.notes)}</div>` : ""}
+        ${transaction.notes ? `<div class="muted">備註：${esc(String(transaction.notes).replace("【大美容折抵2次，取消贈次】", GROOM_RULE))}</div>` : ""}
         ${!transaction.voided ? `<div class="top-actions" style="margin-top:8px">
           <button class="btn small secondary" onclick="openSignatureCorrection(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">更正簽名／重簽</button>
           <button class="btn small secondary" onclick="voidMistakenUsage(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">簽錯券／作廢此筆</button>
@@ -2577,7 +2576,7 @@ function openSignatureCorrection(id) {
   document.getElementById("usageTitle").textContent = "更正此筆顧客簽名";
   document.getElementById("saveUsageButton").textContent = "儲存重簽（不再扣次）";
   document.getElementById("usagePassInfo").innerHTML = `<b>${esc(pass.pet_name)}</b>｜${esc(pass.owner_name)}｜${esc(record.service_date)}｜${esc(record.service_type)}<br>請確認飼主與毛孩，再請顧客重簽；只更新此筆簽名，不新增消費或扣次。`;
-  const values = {serviceDate: record.service_date, redeemedSelect: record.redeemed !== false ? "true" : "false", serviceType: record.service_type, originalPrice: record.original_price, redeemAmount: record.redeem_amount, extraAmount: record.extra_amount, operatorName: record.operator_name, usageNotes: record.notes};
+  const values = {serviceDate: record.service_date, redeemedSelect: record.redeemed !== false ? "true" : "false", serviceType: record.service_type, originalPrice: record.original_price, redeemAmount: record.redeem_amount, extraAmount: record.extra_amount, operatorName: record.operator_name, usageNotes: String(record.notes || "").replace("【大美容折抵2次，取消贈次】", GROOM_RULE)};
   Object.entries(values).forEach(([id, value]) => document.getElementById(id).value = value ?? "");
   setUsageFieldsLocked(true);
   clearSignature();
