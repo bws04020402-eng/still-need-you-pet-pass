@@ -394,6 +394,13 @@
     }
 
     .top-actions .btn { margin: 0; }
+    #usageModal .grid > div { min-width: 0; }
+    #usageModal .signature-footer { flex-wrap: wrap; }
+    .record-head { flex-wrap: wrap; }
+    @media (orientation: landscape) and (max-height: 600px) {
+      #signatureCanvas { height: clamp(140px, 48dvh, 240px); }
+      #usageModal .card { padding: 12px; }
+    }
   </style>
 </head>
 
@@ -639,6 +646,7 @@
             onclick="setRecordFilter('unsigned', this)">
             未簽名
           </button>
+          <button class="chip" onclick="setRecordFilter('voided', this)">已作廢紀錄</button>
 
         </div>
 
@@ -702,7 +710,7 @@
 
       <div class="card">
 
-        <h2>本次消費</h2>
+        <h2 id="usageTitle">本次消費</h2>
 
         <div id="usagePassInfo" class="notice"></div>
 
@@ -782,7 +790,7 @@
 
         </div>
 
-        <button class="btn" type="button" onclick="saveUsage()">
+        <button class="btn" type="button" id="saveUsageButton" onclick="saveUsage()">
           儲存本次紀錄
         </button>
 
@@ -806,6 +814,10 @@ let passFilter = "active";
 let recordFilter = "all";
 let drawing = false;
 let signatureHasInk = false;
+let editingTransactionId = null;
+let signatureStrokes = [];
+let signatureObserver = null;
+let usageSaving = false;
 
 function today() {
   const now = new Date();
@@ -1361,11 +1373,7 @@ function renderSelectedPass() {
     i <= totalUses(pass);
     i++
   ) {
-    const transaction =
-      used.find(
-        item =>
-          Number(item.sequence_no) === i
-      );
+    const transaction = [...used].sort((a, b) => Number(a.sequence_no) - Number(b.sequence_no))[i - 1];
 
     dates += `
       <div class="history-row">
@@ -2197,92 +2205,53 @@ async function voidSelectedPass() {
 }
 
 function openUsage(redeemed) {
-  if (!selectedPass) {
+  editingTransactionId = null;
+  document.getElementById("usageTitle").textContent = "本次消費";
+  document.getElementById("saveUsageButton").textContent = "儲存本次紀錄";
+  setUsageFieldsLocked(false);
+  if (!selectedPass) return;
+
+  if (selectedPass.voided || selectedPass.status === "voided") {
+    alert("此計次券已作廢，不能再折抵或新增消費紀錄。");
     return;
   }
 
-  if (selectedPass.voided) {
-    alert(
-      "此計次券已作廢，不能再折抵或新增消費紀錄。"
-    );
-    return;
-  }
-
-  if (
-    redeemed &&
-    getRemaining(selectedPass) <= 0
-  ) {
+  if (redeemed && getRemaining(selectedPass) <= 0) {
     alert("此計次券已用完");
     return;
   }
 
-  document
-    .getElementById("usageModal")
-    .classList.remove("hidden");
+  document.getElementById("usageModal").classList.remove("hidden");
+  document.getElementById("redeemedSelect").value = redeemed ? "true" : "false";
+  document.getElementById("serviceDate").value = today();
+  document.getElementById("serviceType").value = "洗澡";
+  document.getElementById("originalPrice").value = "";
+  document.getElementById("redeemAmount").value = "";
+  document.getElementById("operatorName").value = "";
+  document.getElementById("usageNotes").value = "";
 
-  document.getElementById(
-    "redeemedSelect"
-  ).value =
-    redeemed ? "true" : "false";
-
-  document.getElementById(
-    "serviceDate"
-  ).value = today();
-
-  document.getElementById(
-    "serviceType"
-  ).value = "洗澡";
-
-  document.getElementById(
-    "originalPrice"
-  ).value = "";
-
-  document.getElementById(
-    "redeemAmount"
-  ).value = "";
-
-  document.getElementById(
-    "operatorName"
-  ).value = "";
-
-  document.getElementById(
-    "usageNotes"
-  ).value = "";
-
-  document.getElementById(
-    "usagePassInfo"
-  ).innerHTML = `
-    <b>
-      ${esc(selectedPass.pet_name)}
-    </b>
-    ｜
-    ${esc(selectedPass.owner_name)}
-    ｜剩餘
-    ${getRemaining(selectedPass)}
-    /
-    ${totalUses(selectedPass)}
-    次
-    ｜到期
-    ${selectedPass.expiry_date || "-"}
+  document.getElementById("usagePassInfo").innerHTML = `
+    <b>${esc(selectedPass.pet_name)}</b>
+    ｜${esc(selectedPass.owner_name)}
+    ｜剩餘 ${getRemaining(selectedPass)} / ${totalUses(selectedPass)} 次
+    ｜到期 ${selectedPass.expiry_date || "-"}
   `;
 
   clearSignature();
   updateUsageMode();
-
-  setTimeout(
-    setupSignature,
-    50
-  );
+  setTimeout(setupSignature, 50);
 }
 
 function closeUsage() {
-  document
-    .getElementById("usageModal")
-    .classList.add("hidden");
-
+  if (usageSaving) return;
+  editingTransactionId = null;
+  document.getElementById("usageModal").classList.add("hidden");
   clearSignature();
 }
 
+/* =========================
+   補差額
+========================= */
 function updateUsageMode() {
   const redeemed =
     document.getElementById(
@@ -2334,48 +2303,68 @@ function autoExtraAmount() {
 }
 
 async function saveUsage() {
-  if (!selectedPass) {
-    alert("找不到計次券");
-    return;
+  if (usageSaving) return;
+  usageSaving = true;
+  const button = document.getElementById("saveUsageButton");
+  button.disabled = true;
+  try {
+    await persistUsage();
+  } catch (error) {
+    alert("儲存失敗：" + (error.message || String(error)));
+  } finally {
+    usageSaving = false;
+    button.disabled = false;
   }
+}
 
-  const passCheck =
-    await client
-      .from("passes")
-      .select("voided")
-      .eq("id", selectedPass.id)
-      .single();
-
-  if (passCheck.error) {
-    alert(
-      "計次券狀態確認失敗：" +
-      passCheck.error.message
-    );
-    return;
-  }
-
-  if (passCheck.data?.voided) {
-    alert(
-      "此計次券已作廢，不能儲存本次紀錄。"
-    );
-
+async function persistUsage() {
+  if (editingTransactionId) {
+    if (!signatureHasInk) return alert("請先請顧客重新簽名");
+    const record = transactions.find(t => t.id === editingTransactionId);
+    if (!record || record.voided) return alert("此紀錄已無法更正，請重新整理");
+    const stamp = new Date().toISOString();
+    const { data, error } = await client.from("transactions").update({
+      signature: document.getElementById("signatureCanvas").toDataURL("image/png"),
+      signed_at: stamp,
+      notes: (record.notes || "") + "\n[簽名更正 " + stamp + "] 原簽名已由顧客重簽"
+    }).eq("id", record.id).eq("signed_at", record.signed_at).eq("voided", false).select("id");
+    if (error) return alert("重簽儲存失敗：" + error.message);
+    if (!data?.length) return alert("紀錄已被其他裝置更動，請重新整理後再試");
+    usageSaving = false;
     closeUsage();
     await refreshData();
+    return alert("已更新簽名，扣次與金額保持原紀錄");
+  }
+  if (!selectedPass) {
+    alert("找不到計次券，請返回重新選擇");
     return;
   }
 
-  const redeemed =
-    document.getElementById(
-      "redeemedSelect"
-    ).value === "true";
+  const passId = selectedPass.id;
 
-  if (
-    redeemed &&
-    getRemaining(selectedPass) <= 0
-  ) {
-    alert(
-      "此計次券已無剩餘次數"
-    );
+  /* 儲存前重新確認資料庫狀態，避免其他裝置剛好已將此券作廢 */
+  const latestPassResult = await client
+    .from("passes")
+    .select("voided,status")
+    .eq("id", passId)
+    .single();
+
+  if (latestPassResult.error) {
+    alert("無法確認計次券狀態：" + latestPassResult.error.message);
+    return;
+  }
+
+  if (latestPassResult.data?.voided || latestPassResult.data?.status === "voided") {
+    closeUsage();
+    await refreshData();
+    alert("此計次券已作廢，不能新增消費紀錄。");
+    return;
+  }
+
+  const redeemed = document.getElementById("redeemedSelect").value === "true";
+
+  if (redeemed && getRemaining(selectedPass) <= 0) {
+    alert("此計次券已無剩餘次數");
     return;
   }
 
@@ -2384,89 +2373,39 @@ async function saveUsage() {
     return;
   }
 
-  const canvas =
-    document.getElementById(
-      "signatureCanvas"
-    );
-
+  const canvas = document.getElementById("signatureCanvas");
   const row = {
-    pass_id:
-      selectedPass.id,
-
-    sequence_no:
-      redeemed
-        ? getUsedCount(
-            selectedPass.id
-          ) + 1
-        : 0,
-
-    service_date:
-      document.getElementById(
-        "serviceDate"
-      ).value || today(),
-
-    service_type:
-      document.getElementById(
-        "serviceType"
-      ).value,
-
-    original_price:
-      num("originalPrice"),
-
-    redeem_amount:
-      redeemed
-        ? num("redeemAmount")
-        : 0,
-
-    extra_amount:
-      num("extraAmount"),
-
-    notes:
-      document.getElementById(
-        "usageNotes"
-      ).value.trim(),
-
-    signature:
-      canvas.toDataURL(
-        "image/png"
-      ),
-
-    operator_name:
-      document.getElementById(
-        "operatorName"
-      ).value.trim(),
-
+    pass_id: passId,
+    sequence_no: redeemed ? Math.max(0, ...transactions.filter(t => t.pass_id === passId).map(t => Number(t.sequence_no) || 0)) + 1 : 0,
+    service_date: document.getElementById("serviceDate").value || today(),
+    service_type: document.getElementById("serviceType").value,
+    original_price: num("originalPrice"),
+    redeem_amount: redeemed ? num("redeemAmount") : 0,
+    extra_amount: num("extraAmount"),
+    notes: document.getElementById("usageNotes").value.trim(),
+    signature: canvas.toDataURL("image/png"),
+    operator_name: document.getElementById("operatorName").value.trim(),
     voided: false,
     redeemed: redeemed,
-
-    signed_at:
-      new Date().toISOString()
+    signed_at: new Date().toISOString()
   };
 
-  const { error } =
-    await client
-      .from("transactions")
-      .insert(row);
+  const { error } = await client.from("transactions").insert(row);
 
   if (error) {
-    alert(
-      "儲存失敗：" +
-      error.message
-    );
+    alert("儲存失敗：" + error.message);
     return;
   }
 
-  alert(
-    redeemed
-      ? "已完成扣次與簽名"
-      : "已保存本次未折抵消費與簽名"
-  );
-
+  alert(redeemed ? "已完成扣次與簽名" : "已保存本次未折抵消費與簽名");
+  usageSaving = false;
   closeUsage();
-
   await refreshData();
 }
 
+/* =========================
+   紀錄
+========================= */
 function setRecordFilter(
   filter,
   button
@@ -2486,198 +2425,87 @@ function setRecordFilter(
 }
 
 function renderRecords() {
-  const dateInput =
-    document.getElementById(
-      "recordDate"
-    );
-
+  const dateInput = document.getElementById("recordDate");
   if (!dateInput) return;
 
-  const date =
-    dateInput.value || today();
+  const date = dateInput.value || today();
+  const keyword = document.getElementById("recordSearch").value.trim().toLowerCase();
 
-  const keyword =
-    document.getElementById(
-      "recordSearch"
-    ).value
-      .trim()
-      .toLowerCase();
+  let list = transactions.filter(
+    transaction => (recordFilter === "voided" ? transaction.voided : !transaction.voided) && transaction.service_date === date
+  );
 
-  let list =
-    transactions.filter(
-      transaction =>
-        !transaction.voided &&
-        transaction.service_date === date
-    );
+  list = list.filter(transaction => {
+    const pass = passes.find(p => p.id === transaction.pass_id);
+    const text = [
+      pass?.pet_name,
+      pass?.owner_name,
+      pass?.phone,
+      transaction.service_type,
+      transaction.operator_name
+    ].join(" ").toLowerCase();
 
-  list =
-    list.filter(transaction => {
-      const pass =
-        passes.find(
-          p =>
-            p.id ===
-            transaction.pass_id
-        );
+    if (keyword && !text.includes(keyword)) return false;
+    if (recordFilter === "redeemed") return transaction.redeemed !== false;
+    if (recordFilter === "notRedeemed") return transaction.redeemed === false;
+    if (recordFilter === "signed") return !!transaction.signature;
+    if (recordFilter === "unsigned") return !transaction.signature;
+    return true;
+  });
 
-      const text = [
-        pass?.pet_name,
-        pass?.owner_name,
-        pass?.phone,
-        transaction.service_type,
-        transaction.operator_name
-      ]
-        .join(" ")
-        .toLowerCase();
+  const box = document.getElementById("recordsList");
+  const summary = document.getElementById("recordSummary");
 
-      if (
-        keyword &&
-        !text.includes(keyword)
-      ) {
-        return false;
-      }
+  const dayAll = transactions.filter(
+    transaction => !transaction.voided && transaction.service_date === date
+  );
 
-      if (
-        recordFilter === "redeemed"
-      ) {
-        return (
-          transaction.redeemed !== false
-        );
-      }
+  const signed = dayAll.filter(transaction => !!transaction.signature).length;
+  const noRedeem = dayAll.filter(transaction => transaction.redeemed === false).length;
 
-      if (
-        recordFilter === "notRedeemed"
-      ) {
-        return (
-          transaction.redeemed === false
-        );
-      }
-
-      if (
-        recordFilter === "signed"
-      ) {
-        return !!transaction.signature;
-      }
-
-      if (
-        recordFilter === "unsigned"
-      ) {
-        return !transaction.signature;
-      }
-
-      return true;
-    });
-
-  const box =
-    document.getElementById(
-      "recordsList"
-    );
-
-  const summary =
-    document.getElementById(
-      "recordSummary"
-    );
-
-  const dayAll =
-    transactions.filter(
-      transaction =>
-        !transaction.voided &&
-        transaction.service_date === date
-    );
-
-  const signed =
-    dayAll.filter(
-      transaction =>
-        !!transaction.signature
-    ).length;
-
-  const noRedeem =
-    dayAll.filter(
-      transaction =>
-        transaction.redeemed === false
-    ).length;
-
-  summary.textContent =
-    `${date}｜共 ${dayAll.length} 筆｜已簽 ${signed}｜未簽 ${dayAll.length - signed}｜未折抵 ${noRedeem}`;
+  summary.textContent = `${date}｜共 ${dayAll.length} 筆｜已簽 ${signed}｜未簽 ${dayAll.length - signed}｜未折抵 ${noRedeem}`;
 
   if (!list.length) {
-    box.innerHTML =
-      '<div class="muted">這個條件沒有紀錄</div>';
+    box.innerHTML = '<div class="muted">這個條件沒有紀錄</div>';
     return;
   }
 
-  box.innerHTML =
-    list.map(transaction => {
-      const pass =
-        passes.find(
-          p =>
-            p.id ===
-            transaction.pass_id
-        );
+  box.innerHTML = list.map(transaction => {
+    const pass = passes.find(p => p.id === transaction.pass_id);
 
-      return `
-        <div class="record-row">
-
-          <div class="record-head">
-
-            <div>
-              <b>
-                ${esc(pass?.pet_name || "未知毛孩")}
-              </b>
-              ・
-              ${esc(pass?.owner_name || "")}
-            </div>
-
-            <div>
-              ${
-                transaction.signature
-                  ? '<span class="signed">已簽名</span>　<details style="display:inline-block"><summary style="color:#06c;text-decoration:underline;cursor:pointer">查看簽名</summary><img src="' + transaction.signature + '" style="display:block;max-width:280px;width:100%;margin-top:10px;border:1px solid #ddd;border-radius:8px;background:white;padding:8px"></details>'
-                  : '<span class="unsigned">未簽名</span>'
-              }
-            </div>
-
+    return `
+      <div class="record-row">
+        <div class="record-head">
+          <div><b>${esc(pass?.pet_name || "未知毛孩")}</b>・${esc(pass?.owner_name || "")}</div>
+          <div>
+            ${transaction.signature
+              ? '<span class="signed">已簽名</span>　<details style="display:inline-block"><summary style="color:#06c;text-decoration:underline;cursor:pointer">查看簽名</summary><img src="' + transaction.signature + '" style="display:block;max-width:280px;width:100%;margin-top:10px;border:1px solid #ddd;border-radius:8px;background:white;padding:8px"></details>'
+              : '<span class="unsigned">未簽名</span>'}
           </div>
-
-          <div class="muted">
-
-            ${
-              transaction.redeemed === false
-                ? "未折抵"
-                : "第 " +
-                  (
-                    transaction.sequence_no ||
-                    "-"
-                  ) +
-                  " 次折抵"
-            }
-
-            ｜
-
-            ${esc(transaction.service_type || "")}
-
-            ｜補差
-            $${money(transaction.extra_amount)}
-
-            ｜經手
-            ${esc(transaction.operator_name || "-")}
-
-          </div>
-
-          ${
-            transaction.notes
-              ? `
-                <div class="muted">
-                  備註：
-                  ${esc(transaction.notes)}
-                </div>
-              `
-              : ""
-          }
-
         </div>
-      `;
-    }).join("");
+
+        <div class="muted">
+          ${transaction.voided ? "已作廢（不扣次）｜" : ""}${transaction.redeemed === false
+            ? "未折抵"
+            : "第 " + (transaction.sequence_no || "-") + " 次折抵"}
+          ｜${esc(transaction.service_type || "")}
+          ｜補差 $${money(transaction.extra_amount)}
+          ｜經手 ${esc(transaction.operator_name || "-")}
+        </div>
+
+        ${transaction.notes ? `<div class="muted">備註：${esc(transaction.notes)}</div>` : ""}
+        ${!transaction.voided ? `<div class="top-actions" style="margin-top:8px">
+          <button class="btn small secondary" onclick="openSignatureCorrection(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">更正簽名／重簽</button>
+          <button class="btn small secondary" onclick="voidMistakenUsage(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">簽錯券／作廢此筆</button>
+        </div>` : ""}
+      </div>
+    `;
+  }).join("");
 }
 
+/* =========================
+   頁面切換
+========================= */
 function showPage(name, button) {
   [
     "search",
@@ -2707,139 +2535,145 @@ function showPage(name, button) {
   }
 }
 
-function setupSignature() {
-  const canvas =
-    document.getElementById(
-      "signatureCanvas"
-    );
+function setUsageFieldsLocked(locked) {
+  ["serviceDate", "redeemedSelect", "serviceType", "originalPrice", "redeemAmount", "extraAmount", "operatorName", "usageNotes"].forEach(id => {
+    document.getElementById(id).disabled = locked;
+  });
+}
 
-  if (!canvas) return;
+function openSignatureCorrection(id) {
+  const record = transactions.find(t => t.id === id && !t.voided);
+  const pass = passes.find(p => p.id === record?.pass_id);
+  if (!record || !pass) return alert("找不到此筆紀錄或計次券");
+  selectedPass = pass;
+  editingTransactionId = id;
+  document.getElementById("usageModal").classList.remove("hidden");
+  document.getElementById("usageTitle").textContent = "更正此筆顧客簽名";
+  document.getElementById("saveUsageButton").textContent = "儲存重簽（不再扣次）";
+  document.getElementById("usagePassInfo").innerHTML = `<b>${esc(pass.pet_name)}</b>｜${esc(pass.owner_name)}｜${esc(record.service_date)}｜${esc(record.service_type)}<br>請確認飼主與毛孩，再請顧客重簽；只更新此筆簽名，不新增消費或扣次。`;
+  const values = {serviceDate: record.service_date, redeemedSelect: record.redeemed !== false ? "true" : "false", serviceType: record.service_type, originalPrice: record.original_price, redeemAmount: record.redeem_amount, extraAmount: record.extra_amount, operatorName: record.operator_name, usageNotes: record.notes};
+  Object.entries(values).forEach(([id, value]) => document.getElementById(id).value = value ?? "");
+  setUsageFieldsLocked(true);
+  clearSignature();
+  requestAnimationFrame(setupSignature);
+}
 
-  const rect =
-    canvas.getBoundingClientRect();
+const voidingRecords = new Set();
+async function voidMistakenUsage(id) {
+  if (voidingRecords.has(id)) return;
+  const record = transactions.find(t => t.id === id && !t.voided);
+  const pass = passes.find(p => p.id === record?.pass_id);
+  if (!record) return;
+  if (!confirm(`確定作廢 ${pass?.pet_name || ""}／${pass?.owner_name || ""} 的 ${record.service_date} 這筆紀錄？\n${record.redeemed !== false ? "此筆扣次將回復。" : "此筆未扣次。"}原紀錄與簽名保留；請另選正確計次券重新登錄及簽名。`)) return;
+  voidingRecords.add(id);
+  try {
+    const stamp = new Date().toISOString();
+    const { data, error } = await client.from("transactions").update({voided: true, notes: (record.notes || "") + "\n[簽錯券作廢 " + stamp + "] 請另選正確券重新登錄"}).eq("id", id).eq("signed_at", record.signed_at).eq("voided", false).select("id");
+    if (error) return alert("作廢失敗：" + error.message);
+    if (!data?.length) return alert("紀錄已被更動，請重新整理後再試");
+    await refreshData();
+    if (selectedPass) {
+      selectedPass = passes.find(p => p.id === selectedPass.id) || selectedPass;
+      renderSelectedPass();
+    }
+    alert("已作廢此筆，請選正確計次券重新登錄及簽名");
+  } catch (error) {
+    alert("作廢失敗：" + (error.message || String(error)));
+  } finally {
+    voidingRecords.delete(id);
+  }
+}
 
-  if (!rect.width) return;
-
-  const ratio =
-    window.devicePixelRatio || 1;
-
-  canvas.width =
-    rect.width * ratio;
-
-  canvas.height =
-    320 * ratio;
-
-  const context =
-    canvas.getContext("2d");
-
-  context.setTransform(
-    ratio,
-    0,
-    0,
-    ratio,
-    0,
-    0
-  );
-
+function redrawSignature() {
+  const canvas = document.getElementById("signatureCanvas");
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width || !rect.height) return;
+  const ratio = window.devicePixelRatio || 1;
+  canvas.width = Math.round(rect.width * ratio);
+  canvas.height = Math.round(rect.height * ratio);
+  const context = canvas.getContext("2d");
+  context.setTransform(ratio, 0, 0, ratio, 0, 0);
   context.lineWidth = 3;
   context.lineCap = "round";
   context.lineJoin = "round";
   context.strokeStyle = "#111";
+  signatureStrokes.forEach(stroke => {
+    context.beginPath();
+    stroke.forEach((p, i) => {
+      const x = p.x * rect.width, y = p.y * rect.height;
+      if (!i) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    if (stroke.length === 1) {
+      context.lineTo(stroke[0].x * rect.width + 0.1, stroke[0].y * rect.height + 0.1);
+    }
+    context.stroke();
+  });
+}
 
+function setupSignature() {
+  const canvas = document.getElementById("signatureCanvas");
+  if (!canvas) return;
+  redrawSignature();
+  let activePointer = null;
   function point(event) {
-    const canvasRect =
-      canvas.getBoundingClientRect();
-
-    const source =
-      event.touches
-        ? event.touches[0]
-        : event;
-
-    return {
-      x:
-        source.clientX -
-        canvasRect.left,
-
-      y:
-        source.clientY -
-        canvasRect.top
-    };
+    const rect = canvas.getBoundingClientRect();
+    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height };
   }
-
-  function start(event) {
+  canvas.onpointerdown = event => {
+    if (activePointer !== null || (event.pointerType === "mouse" && event.button !== 0)) return;
     event.preventDefault();
-
+    activePointer = event.pointerId;
+    canvas.setPointerCapture(event.pointerId);
     drawing = true;
     signatureHasInk = true;
-
-    const state =
-      document.getElementById(
-        "signatureState"
-      );
-
-    state.textContent = "已簽名";
-    state.className = "signed";
-
-    const p = point(event);
-
-    context.beginPath();
-    context.moveTo(p.x, p.y);
-  }
-
-  function move(event) {
-    if (!drawing) return;
-
+    signatureStrokes.push([point(event)]);
+    document.getElementById("signatureState").textContent = "已簽名";
+    document.getElementById("signatureState").className = "signed";
+    redrawSignature();
+  };
+  canvas.onpointermove = event => {
+    if (!drawing || event.pointerId !== activePointer) return;
     event.preventDefault();
-
-    const p = point(event);
-
-    context.lineTo(p.x, p.y);
-    context.stroke();
-  }
-
-  function end() {
+    signatureStrokes[signatureStrokes.length - 1].push(point(event));
+    redrawSignature();
+  };
+  function end(event) {
+    if (event.pointerId !== activePointer) return;
     drawing = false;
+    activePointer = null;
   }
-
-  canvas.onpointerdown = start;
-  canvas.onpointermove = move;
   canvas.onpointerup = end;
-  canvas.onpointerleave = end;
-  canvas.ontouchstart = start;
-  canvas.ontouchmove = move;
-  canvas.ontouchend = end;
+  canvas.onpointercancel = end;
+  canvas.onlostpointercapture = end;
+  if (!signatureObserver && window.ResizeObserver) {
+    signatureObserver = new ResizeObserver(() => {
+      if (!document.getElementById("usageModal").classList.contains("hidden")) redrawSignature();
+    });
+    signatureObserver.observe(canvas);
+  }
 }
 
 function clearSignature() {
-  const canvas =
-    document.getElementById(
-      "signatureCanvas"
-    );
-
-  if (canvas) {
-    const context =
-      canvas.getContext("2d");
-
-    context.clearRect(
-      0,
-      0,
-      canvas.width,
-      canvas.height
-    );
-  }
-
+  drawing = false;
   signatureHasInk = false;
-
-  const state =
-    document.getElementById(
-      "signatureState"
-    );
-
+  signatureStrokes = [];
+  const canvas = document.getElementById("signatureCanvas");
+  if (canvas) {
+    canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+    // Reset handlers and pointer state when starting another signature.
+    setupSignature();
+  }
+  const state = document.getElementById("signatureState");
   if (state) {
     state.textContent = "尚未簽名";
     state.className = "muted";
   }
 }
+window.addEventListener("resize", () => {
+  if (!document.getElementById("usageModal").classList.contains("hidden")) redrawSignature();
+});
+
 
 window.addEventListener(
   "DOMContentLoaded",
