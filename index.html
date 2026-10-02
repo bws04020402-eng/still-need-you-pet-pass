@@ -555,6 +555,8 @@
           <div>
             <label>使用期限</label>
             <input id="expiryDate" type="date">
+            <label><input id="buyAhead" type="checkbox" style="width:auto" onchange="autoExpiry()"> 先買券，首次折抵時啟用</label>
+            <p class="muted">勾選後不從付款日計期限；首次折抵起算一般45天／共用25天。</p>
           </div>
 
           <div>
@@ -586,11 +588,11 @@
         <textarea id="passNotes"></textarea>
 
         <div class="notice">
-          一般計次券自動45天；共用券自動25天。第5次為贈送。
+          可先收款買券，建立時不扣次數；到店使用時再新增折抵與簽名紀錄。<br>使用期限預設從付款日起算：一般45天、共用25天，可自行修改。第5次為贈送。
         </div>
 
         <button class="btn" type="button" onclick="createPass()">
-          建立計次券
+          收款並建立計次券（不扣次數）
         </button>
 
       </div>
@@ -1166,6 +1168,8 @@ function getPassStatus(pass) {
     return "completed";
   }
 
+  if (!pass.expiry_date && getUsedCount(pass.id) === 0) return "pending";
+
   const days =
     daysUntil(pass.expiry_date);
 
@@ -1183,6 +1187,7 @@ function getPassStatus(pass) {
 function statusText(status) {
   return {
     active: "有效",
+    pending: "已購買・待啟用",
     soon: "7天內到期",
     expired: "已到期",
     completed: "已用完",
@@ -1243,7 +1248,7 @@ function renderSearchResults() {
       if (passFilter === "active") {
         return (
           status === "active" ||
-          status === "soon"
+          status === "soon" || status === "pending"
         );
       }
 
@@ -1314,7 +1319,7 @@ function renderSearchResults() {
             <div>
               <span class="muted">到期</span>
               <b style="font-size:14px">
-                ${pass.expiry_date || "-"}
+                ${pass.expiry_date || "首次折抵時啟用"}
               </b>
             </div>
 
@@ -1517,7 +1522,7 @@ function renderSelectedPass() {
 
           <div class="paper-row">
             使用期限：
-            ${pass.expiry_date || "-"}
+            ${pass.expiry_date || "首次折抵時啟用"}
           </div>
 
           <div class="paper-row">
@@ -1646,6 +1651,9 @@ function renderSelectedPass() {
 }
 
 function autoExpiry() {
+  const pending = document.getElementById("buyAhead").checked;
+  document.getElementById("expiryDate").disabled = pending;
+  if (pending) { document.getElementById("expiryDate").value = ""; return; }
   const payment =
     document.getElementById(
       "paymentDate"
@@ -1694,6 +1702,13 @@ async function createPass() {
     return;
   }
 
+  const paymentDate = document.getElementById("paymentDate").value;
+  const expiryDate = document.getElementById("buyAhead").checked ? "" : document.getElementById("expiryDate").value;
+  if (paymentDate && expiryDate && expiryDate < paymentDate) {
+    alert("使用期限不能早於付款日，請確認日期");
+    return;
+  }
+
   const row = {
     owner_name: owner,
 
@@ -1735,9 +1750,7 @@ async function createPass() {
       ).value || null,
 
     expiry_date:
-      document.getElementById(
-        "expiryDate"
-      ).value || null,
+      expiryDate || null,
 
     bath_extra_amount:
       num("bathExtraAmount"),
@@ -1778,7 +1791,8 @@ async function createPass() {
     return;
   }
 
-  alert("建立成功");
+  alert(document.getElementById("buyAhead").checked ? "預購券建立成功，尚未扣次；首次折抵時開始計算期限。" : "買券建立成功，尚未扣次數。到店使用時再新增折抵與簽名紀錄。");
+  document.getElementById("buyAhead").checked = false;
 
   [
     "ownerName",
@@ -1889,6 +1903,13 @@ function editSelectedPass() {
         </button>
 
       </div>
+
+      <label>付款日</label>
+      <input id="editPaymentDate" type="date" value="${esc(pass.payment_date || "")}">
+
+      <label>使用期限</label>
+      <input id="editExpiryDate" type="date" value="${esc(pass.expiry_date || "")}">
+      <p class="muted">付款日與使用期限可分別修改。未使用的預購券可留空使用期限，首次折抵自動起算；修改付款日不會改動使用期限。</p>
 
       <label>飼主姓名</label>
       <input
@@ -2066,7 +2087,20 @@ async function saveEditedPass() {
   const number = id =>
     Number(value(id) || 0);
 
+  const paymentDate = value("editPaymentDate");
+  const expiryDate = value("editExpiryDate");
+  if (paymentDate && expiryDate && expiryDate < paymentDate) {
+    alert("使用期限不能早於付款日，請確認日期");
+    return;
+  }
+
+  if (!expiryDate && getUsedCount(selectedPass.id) > 0) {
+    alert("已使用的券請填使用期限，不能改回待啟用"); return;
+  }
+
   const updates = {
+    payment_date: paymentDate || null,
+    expiry_date: expiryDate || null,
     owner_name:
       value("editOwnerName").trim(),
 
@@ -2247,7 +2281,7 @@ function openUsage(redeemed) {
     <b>${esc(selectedPass.pet_name)}</b>
     ｜${esc(selectedPass.owner_name)}
     ｜剩餘 ${getRemaining(selectedPass)} / ${totalUses(selectedPass)} 次
-    ｜到期 ${selectedPass.expiry_date || "-"}
+    ｜到期 ${selectedPass.expiry_date || "首次折抵時啟用"}
   `;
 
   clearSignature();
@@ -2363,7 +2397,7 @@ async function persistUsage() {
   /* 儲存前重新確認資料庫狀態，避免其他裝置剛好已將此券作廢 */
   const latestPassResult = await client
     .from("passes")
-    .select("voided,status")
+    .select("voided,status,expiry_date")
     .eq("id", passId)
     .single();
 
@@ -2398,6 +2432,7 @@ async function persistUsage() {
     return;
   }
 
+  const activateOnSave = redeemed && !latestPassResult.data.expiry_date && getUsedCount(passId) === 0;
   const canvas = document.getElementById("signatureCanvas");
   const row = {
     pass_id: passId,
@@ -2422,6 +2457,17 @@ async function persistUsage() {
     return;
   }
 
+  if (activateOnSave) {
+    const activationExpiry = addDays(row.service_date, selectedPass.shared_pass ? 25 : 45);
+    const activation = await client.from("passes").update({expiry_date: activationExpiry}).eq("id", passId).is("expiry_date", null).select("id");
+    if (activation.error) {
+      usageSaving = false;
+      closeUsage();
+      await refreshData();
+      alert("消費與簽名已儲存，請勿重複登錄。啟用期限儲存失敗，請在修改計次券填入使用期限：" + activationExpiry + "；" + activation.error.message);
+      return;
+    }
+  }
   alert(groomRedemption ? "已簽名並折抵1次，贈送一次已取消" : redeemed ? "已完成扣次與簽名" : "已保存本次未折抵消費與簽名");
   usageSaving = false;
   closeUsage();
