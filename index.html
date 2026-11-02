@@ -494,6 +494,7 @@
       <div class="card">
 
         <h2>建立電子計次券</h2>
+        <div id="copyPassNotice" class="notice hidden" role="status"></div>
 
         <div class="grid">
 
@@ -591,7 +592,7 @@
           可先收款買券，建立時不扣次數；到店使用時再新增折抵與簽名紀錄。<br>使用期限預設從付款日起算：一般45天、共用25天，可自行修改。第5次為贈送。
         </div>
 
-        <button class="btn" type="button" onclick="createPass()">
+        <button id="createPassButton" class="btn" type="button" onclick="createPass()">
           收款並建立計次券（不扣次數）
         </button>
 
@@ -821,6 +822,7 @@ let editingTransactionId = null;
 let signatureStrokes = [];
 let signatureObserver = null;
 let usageSaving = false;
+let passCreating = false;
 
 function today() {
   const now = new Date();
@@ -1633,6 +1635,10 @@ function renderSelectedPass() {
         }
       </button>
 
+      <button class="btn secondary" type="button" onclick="copySelectedPass()">
+        複製客人資料，開新券
+      </button>
+
       <button
         class="btn secondary"
         type="button"
@@ -1648,6 +1654,32 @@ function renderSelectedPass() {
 
     </div>
   `;
+}
+
+function copySelectedPass() {
+  if (!selectedPass || passCreating) return;
+  const draftFields = ["ownerName", "phone", "petName", "breed", "passAmount", "stylingAddon", "stylingAddonAmount", "passAddonAmount", "spaAddonAmount", "totalPaid", "bathExtraAmount", "groomExtraAmount", "sharedPetName", "passNotes"];
+  if ((draftFields.some(id => document.getElementById(id).value !== "") ||
+      document.getElementById("sharedPass").checked || document.getElementById("buyAhead").checked) &&
+      !confirm("開券頁已有未儲存資料，要以這位客人的資料重新填寫嗎？")) return;
+
+  const source = selectedPass;
+  draftFields.forEach(id => { document.getElementById(id).value = ""; });
+  // Whitelist customer/pet fields only. Never copy IDs, money, usage or signatures.
+  const values = {ownerName: source.owner_name, phone: source.phone, petName: source.pet_name, breed: source.breed, sharedPetName: source.shared_pass ? source.shared_pet_name : ""};
+  Object.entries(values).forEach(([id, value]) => {
+    document.getElementById(id).value = value ?? "";
+  });
+  document.getElementById("sharedPass").checked = !!source.shared_pass;
+  document.getElementById("buyAhead").checked = false;
+  document.getElementById("paymentDate").value = today();
+  autoExpiry();
+  const notice = document.getElementById("copyPassNotice");
+  notice.textContent = `已帶入 ${source.owner_name || ""}／${source.pet_name || ""} 的客人與毛孩資料，尚未建立新券。請確認共用設定、付款日、期限及本次金額；舊券紀錄與簽名不會複製。`;
+  notice.classList.remove("hidden");
+  showPage("create", document.querySelectorAll(".tab")[1]);
+  document.getElementById("createPage").scrollIntoView({block: "start"});
+  document.getElementById("passAmount").focus({preventScroll: true});
 }
 
 function autoExpiry() {
@@ -1687,6 +1719,21 @@ function autoTotalPaid() {
 }
 
 async function createPass() {
+  if (passCreating) return;
+  passCreating = true;
+  const button = document.getElementById("createPassButton");
+  button.disabled = true;
+  try {
+    await persistNewPass();
+  } catch (error) {
+    alert("開券處理發生錯誤，請先查券確認是否已建立，再決定是否重試：" + (error.message || String(error)));
+  } finally {
+    passCreating = false;
+    button.disabled = false;
+  }
+}
+
+async function persistNewPass() {
   const owner =
     document.getElementById(
       "ownerName"
@@ -1793,6 +1840,7 @@ async function createPass() {
 
   alert(document.getElementById("buyAhead").checked ? "預購券建立成功，尚未扣次；首次折抵時開始計算期限。" : "買券建立成功，尚未扣次數。到店使用時再新增折抵與簽名紀錄。");
   document.getElementById("buyAhead").checked = false;
+  document.getElementById("copyPassNotice").classList.add("hidden");
 
   [
     "ownerName",
@@ -2790,3 +2838,4 @@ window.addEventListener(
 
 </body>
 </html>
+
