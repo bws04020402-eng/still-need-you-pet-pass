@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="referrer" content="no-referrer">
   <title>孩要有你｜電子計次券</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -797,6 +798,8 @@
         <button class="btn" type="button" id="saveUsageButton" onclick="saveUsage()">
           儲存本次紀錄
         </button>
+        <button class="btn secondary" type="button" id="remoteUsageButton" onclick="saveRemoteUsage()">儲存並產生手機簽名連結</button>
+        <p class="muted">傳連結模式：確認儲存就登錄本次扣次，狀態為「待簽名」；客人簽名不會再扣次。若不使用本次紀錄，需由員工作廢回復。</p>
 
       </div>
     </div>
@@ -823,6 +826,9 @@ let signatureStrokes = [];
 let signatureObserver = null;
 let usageSaving = false;
 let passCreating = false;
+let remoteOperationId = null;
+let remoteLinkTimer = null;
+const REMOTE_API = SUPABASE_URL + "/functions/v1/remote-signature";
 
 function today() {
   const now = new Date();
@@ -2300,6 +2306,7 @@ async function voidSelectedPass() {
 }
 
 function openUsage(redeemed) {
+  remoteOperationId = null;
   editingTransactionId = null;
   document.getElementById("usageTitle").textContent = "本次消費";
   document.getElementById("saveUsageButton").textContent = "儲存本次紀錄";
@@ -2423,11 +2430,12 @@ async function persistUsage() {
     const record = transactions.find(t => t.id === editingTransactionId);
     if (!record || record.voided) return alert("此紀錄已無法更正，請重新整理");
     const stamp = new Date().toISOString();
-    const { data, error } = await client.from("transactions").update({
+    const correctionQuery = client.from("transactions").update({
       signature: document.getElementById("signatureCanvas").toDataURL("image/png"),
       signed_at: stamp,
       notes: (record.notes || "") + "\n[簽名更正 " + stamp + "] 原簽名已由顧客重簽"
-    }).eq("id", record.id).eq("signed_at", record.signed_at).eq("voided", false).select("id");
+    }).eq("id", record.id).eq("voided", false);
+    const { data, error } = await withSignedAtMatch(correctionQuery, record.signed_at).select("id");
     if (error) return alert("重簽儲存失敗：" + error.message);
     if (!data?.length) return alert("紀錄已被其他裝置更動，請重新整理後再試");
     usageSaving = false;
@@ -2615,6 +2623,7 @@ function renderRecords() {
         ${transaction.notes ? `<div class="muted">備註：${esc(String(transaction.notes).replace("【大美容折抵2次，取消贈次】", GROOM_RULE))}</div>` : ""}
         ${!transaction.voided ? `<div class="top-actions" style="margin-top:8px">
           <button class="btn small secondary" onclick="openSignatureCorrection(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">更正簽名／重簽</button>
+          <button class="btn small secondary" onclick="issueRemoteLink(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">傳手機簽名連結</button>
           <button class="btn small secondary" onclick="voidMistakenUsage(decodeURIComponent('${encodeURIComponent(transaction.id).replace(/'/g, '%27')}'))">簽錯券／作廢此筆</button>
         </div>` : ""}
       </div>
@@ -2687,7 +2696,8 @@ async function voidMistakenUsage(id) {
   voidingRecords.add(id);
   try {
     const stamp = new Date().toISOString();
-    const { data, error } = await client.from("transactions").update({voided: true, notes: (record.notes || "") + "\n[簽錯券作廢 " + stamp + "] 請另選正確券重新登錄"}).eq("id", id).eq("signed_at", record.signed_at).eq("voided", false).select("id");
+    const voidQuery = client.from("transactions").update({voided: true, notes: (record.notes || "") + "\n[簽錯券作廢 " + stamp + "] 請另選正確券重新登錄"}).eq("id", id).eq("voided", false);
+    const { data, error } = await withSignedAtMatch(voidQuery, record.signed_at).select("id");
     if (error) return alert("作廢失敗：" + error.message);
     if (!data?.length) return alert("紀錄已被更動，請重新整理後再試");
     await refreshData();
@@ -2794,9 +2804,160 @@ window.addEventListener("resize", () => {
 });
 
 
+function withSignedAtMatch(query, stamp) {
+  return stamp == null ? query.is("signed_at", null) : query.eq("signed_at", stamp);
+}
+
+async function remoteRequest(body, staff = false) {
+  const headers = {"Content-Type":"application/json", apikey:SUPABASE_PUBLISHABLE_KEY};
+  if (staff) {
+    const {data,error} = await client.auth.getSession();
+    if (error || !data.session) throw new Error("請重新登入店內系統");
+    headers.Authorization = "Bearer " + data.session.access_token;
+  }
+  const response = await fetch(REMOTE_API, {method:"POST",headers,body:JSON.stringify(body),cache:"no-store"});
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || "暫時無法處理");
+  return result;
+}
+
+async function issueRemoteLink(id) {
+  if (usageSaving) return;
+  const record = transactions.find(t => t.id === id && !t.voided);
+  if (!record) return alert("找不到紀錄，請重新整理。");
+  if (!confirm("產生24小時有效的" + (record.signature ? "重簽" : "補簽") + "連結？舊連結會失效，這個動作不會再扣次。")) return;
+  usageSaving = true;
+  try {
+    const result = await remoteRequest({action:"issue",transaction_id:id},true);
+    showRemoteLink(result,id);
+  } catch(error) {alert(error.message || "無法產生連結");}
+  finally {usageSaving=false;}
+}
+
+async function saveRemoteUsage() {
+  if (usageSaving) return;
+  if (editingTransactionId) {
+    const id = editingTransactionId;
+    await issueRemoteLink(id);
+    return;
+  }
+  if (!selectedPass) return alert("請先選券");
+  if (!confirm("確認先儲存本次服務與扣次，再傳連結給客人簽名？簽名未完成仍會保留本次扣次，請在紀錄頁追蹤。")) return;
+  usageSaving=true;
+  const button=document.getElementById("remoteUsageButton");
+  const localButton=document.getElementById("saveUsageButton");
+  button.disabled=localButton.disabled=true;
+  if(!remoteOperationId) remoteOperationId=crypto.randomUUID();
+  try {
+    const data={pass_id:selectedPass.id,service_date:document.getElementById("serviceDate").value || today(),
+      service_type:document.getElementById("serviceType").value,redeemed:document.getElementById("redeemedSelect").value==="true",
+      original_price:num("originalPrice"),redeem_amount:num("redeemAmount"),extra_amount:num("extraAmount"),
+      notes:document.getElementById("usageNotes").value.trim(),operator_name:document.getElementById("operatorName").value.trim()};
+    if (![data.original_price,data.redeem_amount,data.extra_amount].every(n=>Number.isFinite(n)&&n>=0&&n<=1000000)) throw new Error("請確認金額為有效的非負數字");
+    const result=await remoteRequest({action:"create",operation_id:remoteOperationId,data},true);
+    usageSaving=false;
+    closeUsage();
+    showRemoteLink(result,result.transaction_id);
+    await refreshData();
+  } catch(error) {alert((error.message || "處理失敗") + "\n若網路中斷，請先查紀錄；不要另開一筆。同一畫面重試不會重複扣次。");}
+  finally {usageSaving=false;button.disabled=localButton.disabled=false;}
+}
+
+function closeRemoteLink() {
+  clearInterval(remoteLinkTimer);
+  remoteLinkTimer=null;
+  document.getElementById("remoteLinkModal")?.remove();
+}
+
+function showRemoteLink(result,id) {
+  closeRemoteLink();
+  const base=new URL(location.href);base.hash="";base.search="";
+  const url=base.href+"#sign="+result.token;
+  const modal=document.createElement("div");modal.id="remoteLinkModal";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:130;padding:20px;overflow:auto";
+  modal.innerHTML=`<div class="card" style="max-width:540px;margin:20px auto"><h2>客人手機簽名</h2><p class="muted">24小時有效，簽完失效。請只傳給這筆紀錄的客人。</p><label>簽名連結（可長按複製）</label><textarea id="remoteLinkText" readonly></textarea><div id="remoteQR" style="text-align:center;margin:16px 0"></div><p id="remoteLinkStatus" role="status">等待客人簽名</p><button id="copyRemoteLink" class="btn">複製連結，貼到 LINE</button><button id="shareRemoteLink" class="btn secondary">分享連結</button><button class="btn secondary" onclick="closeRemoteLink()">關閉（連結仍有效）</button></div>`;
+  document.body.appendChild(modal);
+  document.getElementById("remoteLinkText").value=url;
+  document.getElementById("copyRemoteLink").onclick=async()=>{
+    try {await navigator.clipboard.writeText(url);document.getElementById("remoteLinkStatus").textContent="已複製，請貼到客人的 LINE";}
+    catch {document.getElementById("remoteLinkText").select();alert("請長按連結選擇複製");}
+  };
+  document.getElementById("shareRemoteLink").onclick=async()=>{
+    if(!navigator.share) return document.getElementById("copyRemoteLink").click();
+    try {await navigator.share({title:"孩要有你｜本次服務簽名",text:"請確認本次服務後簽名，連結24小時內有效。",url});}catch{}
+  };
+  function drawQR(){
+    if(!window.qrcode || !document.getElementById("remoteQR")) return;
+    const qr=window.qrcode(0,"M");qr.addData(url);qr.make();
+    document.getElementById("remoteQR").innerHTML=qr.createSvgTag({cellSize:4,margin:4,scalable:true});
+    const svg=document.querySelector("#remoteQR svg");if(svg)svg.style.cssText="max-width:280px;width:100%;background:white";
+  }
+  if(window.qrcode)drawQR();
+  else {
+    let script=document.getElementById("remoteQRLibrary");
+    if(!script){script=document.createElement("script");script.id="remoteQRLibrary";script.src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js";script.referrerPolicy="no-referrer";document.head.appendChild(script);}
+    script.addEventListener("load",drawQR,{once:true});
+    script.onerror=()=>{const el=document.getElementById("remoteQR");if(el)el.textContent="QR Code 載入失敗，仍可複製連結傳送。";};
+  }
+  const initial=transactions.find(t=>t.id===id)?.signed_at || null;
+  let checking=false;
+  remoteLinkTimer=setInterval(async()=>{
+    if(checking || document.hidden)return;checking=true;
+    try{
+      const {data,error}=await client.from("transactions").select("signature,signed_at,voided").eq("id",id).single();
+      if(error)return;
+      if(data.voided || (data.signature && data.signed_at!==initial)){
+        document.getElementById("remoteLinkStatus").textContent=data.voided?"此筆已作廢，連結無法再簽名":"已收到客人簽名 ✓";
+        clearInterval(remoteLinkTimer);await refreshData();
+      }
+    }finally{checking=false;}
+  },8000);
+}
+
+async function openCustomerSignature(token) {
+  document.getElementById("loginScreen").classList.add("hidden");
+  document.getElementById("mainApp").classList.add("hidden");
+  const page=document.createElement("main");page.style.cssText="max-width:650px;margin:auto;padding:18px";
+  page.innerHTML=`<div class="card"><h1 style="font-size:23px">孩要有你｜服務簽名</h1><p id="customerSignStatus" role="status">正在讀取本次服務…</p><div id="customerSignInfo"></div><div id="customerSignForm" class="hidden"><p>請核對毛孩、日期、服務與金額。如有不符，請勿簽名並聯絡店家。</p><div class="signature-wrap"><canvas id="customerCanvas" style="width:100%;height:clamp(150px,38dvh,280px);display:block;touch-action:none"></canvas></div><button id="customerClear" class="btn secondary">清除重簽</button><label><input id="customerAgree" type="checkbox" style="width:auto"> 我已核對以上服務與金額，確認送出簽名</label><button id="customerSubmit" class="btn">確認送出簽名</button><p class="muted">本頁只補簽／重簽，不會新增扣次。請勿將連結轉傳給他人。</p></div></div>`;
+  document.body.appendChild(page);
+  const state=document.getElementById("customerSignStatus");
+  try {
+    const data=await remoteRequest({action:"read",token});
+    state.textContent=data.is_correction?"本次為更正簽名":"請完成本次服務簽名";
+    document.getElementById("customerSignInfo").innerHTML=`<div class="notice"><b>${esc(data.pet_name)}</b>${data.shared_pet_name?"／"+esc(data.shared_pet_name):""}<br>日期：${esc(data.service_date)}<br>服務：${esc(data.service_type)}<br>${data.redeemed?"本次折抵1次"+(data.gift_cancelled?"，取消贈次":""):"本次不折抵"}<br>服務原價：$${money(data.original_price)}<br>扣抵金額：$${money(data.redeem_amount)}<br>補差額：$${money(data.extra_amount)}</div>`;
+    document.getElementById("customerSignForm").classList.remove("hidden");
+    const canvas=document.getElementById("customerCanvas");let strokes=[],pointer=null,saving=false;
+    function redraw(){const rect=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1;if(!rect.width)return;canvas.width=Math.round(rect.width*ratio);canvas.height=Math.round(rect.height*ratio);const ctx=canvas.getContext("2d");ctx.setTransform(ratio,0,0,ratio,0,0);ctx.lineWidth=3;ctx.lineCap="round";ctx.lineJoin="round";strokes.forEach(s=>{ctx.beginPath();s.forEach((p,i)=>{const x=p.x*rect.width,y=p.y*rect.height;i?ctx.lineTo(x,y):ctx.moveTo(x,y);});if(s.length===1)ctx.lineTo(s[0].x*rect.width+.1,s[0].y*rect.height+.1);ctx.stroke();});}
+    const point=e=>{const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)/r.width,y:(e.clientY-r.top)/r.height};};
+    canvas.onpointerdown=e=>{if(saving||pointer!==null||(e.pointerType==="mouse"&&e.button!==0))return;e.preventDefault();pointer=e.pointerId;canvas.setPointerCapture(pointer);strokes.push([point(e)]);redraw();};
+    canvas.onpointermove=e=>{if(saving||e.pointerId!==pointer)return;e.preventDefault();strokes[strokes.length-1].push(point(e));redraw();};
+    canvas.onpointerup=canvas.onpointercancel=canvas.onlostpointercapture=e=>{if(pointer===e.pointerId)pointer=null;};
+    const observer=new ResizeObserver(redraw);observer.observe(canvas);redraw();
+    document.getElementById("customerClear").onclick=()=>{if(!saving){strokes=[];pointer=null;redraw();}};
+    document.getElementById("customerSubmit").onclick=async()=>{
+      if(saving)return;
+      if(!strokes.length)return alert("請先簽名");
+      if(!document.getElementById("customerAgree").checked)return alert("請先核對並勾選確認");
+      saving=true;document.getElementById("customerSubmit").disabled=true;
+      document.getElementById("customerClear").disabled=true;
+      state.textContent="簽名傳送中，請勿關閉…";
+      try {
+        await remoteRequest({action:"sign",token,signature:canvas.toDataURL("image/png")});
+        observer.disconnect();document.getElementById("customerSignForm").classList.add("hidden");
+        state.textContent="簽名已完成，謝謝您！可以關閉此頁，不會再次扣次。";
+        history.replaceState(null,"",location.pathname);
+      } catch(error){state.textContent=error.message+" 若剛剛已送出但網路中斷，請先向店家確認簽名是否收到。";saving=false;document.getElementById("customerSubmit").disabled=false;document.getElementById("customerClear").disabled=false;}
+    };
+  } catch(error){state.textContent=error.message || "連結無法使用，請聯絡店家。";}
+}
+
 window.addEventListener(
   "DOMContentLoaded",
   async () => {
+    if (location.hash.startsWith("#sign=")) {
+      await openCustomerSignature(location.hash.slice(6));
+      return;
+    }
     const loginButton =
       document.getElementById(
         "loginButton"
@@ -2838,4 +2999,5 @@ window.addEventListener(
 
 </body>
 </html>
+
 
