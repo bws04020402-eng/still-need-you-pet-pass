@@ -447,7 +447,7 @@
           id="quickSearch"
           class="searchbox"
           placeholder="搜尋毛孩、飼主、電話、犬種"
-          oninput="renderSearchResults()"
+          oninput="scheduleSearch()"
         >
 
         <div class="filters">
@@ -828,6 +828,15 @@ let usageSaving = false;
 let passCreating = false;
 let remoteOperationId = null;
 let remoteLinkTimer = null;
+let dataRefreshPromise = null;
+let indexedTransactions = null;
+let transactionsByPass = new Map();
+let searchTimer = null;
+let searchLimit = 50;
+let searchKey = "";
+let recordLimit = 50;
+let recordKey = "";
+const signatureImageCache = new Map();
 const REMOTE_API = SUPABASE_URL + "/functions/v1/remote-signature";
 
 function today() {
@@ -1082,37 +1091,33 @@ async function openApp(user) {
   }
 }
 
+async function readAllLightweight(table, passId = null) {
+  const rows = [];
+  for (let offset = 0; ; offset += 500) {
+    let query = client.from(table).select("*")
+      .order("created_at", {ascending:false}).order("id", {ascending:false});
+    if (passId) query = query.eq("pass_id", passId);
+    const {data,error} = await query.range(offset, offset + 499);
+    if (error) throw new Error("資料讀取失敗：" + error.message);
+    rows.push(...(data || []));
+    if (!data || data.length < 500) return rows;
+  }
+}
+
 async function refreshData() {
-  const passResult =
-    await client
-      .from("passes")
-      .select("*")
-      .order("created_at", { ascending: false });
+  if (dataRefreshPromise) return dataRefreshPromise;
+  dataRefreshPromise = refreshLightweightData();
+  try { await dataRefreshPromise; }
+  finally { dataRefreshPromise = null; }
+}
 
-  if (passResult.error) {
-    throw new Error(
-      "計次券讀取失敗：" +
-      passResult.error.message
-    );
-  }
-
-  passes = passResult.data || [];
-
-  const transactionResult =
-    await client
-      .from("transactions")
-      .select("*")
-      .order("created_at", { ascending: false });
-
-  if (transactionResult.error) {
-    throw new Error(
-      "紀錄讀取失敗：" +
-      transactionResult.error.message
-    );
-  }
-
-  transactions =
-    transactionResult.data || [];
+async function refreshLightweightData() {
+  const [nextPasses,nextTransactions] = await Promise.all([
+    readAllLightweight("passes"), readAllLightweight("transaction_summaries")
+  ]);
+  passes = nextPasses;
+  transactions = nextTransactions;
+  signatureImageCache.clear();
 
   renderSearchResults();
   renderRecords();
@@ -1128,12 +1133,56 @@ async function refreshData() {
 }
 
 function usedTransactions(passId) {
-  return transactions.filter(
-    t =>
-      t.pass_id === passId &&
-      !t.voided &&
-      t.redeemed !== false
-  );
+  if (indexedTransactions !== transactions) {
+    transactionsByPass = new Map();
+    for (const t of transactions) {
+      if (t.voided || t.redeemed === false) continue;
+      if (!transactionsByPass.has(t.pass_id)) transactionsByPass.set(t.pass_id,[]);
+      transactionsByPass.get(t.pass_id).push(t);
+    }
+    indexedTransactions = transactions;
+  }
+  return transactionsByPass.get(passId) || [];
+}
+
+function hasSignature(record) {
+  return record?.has_signature ?? !!record?.signature;
+}
+
+async function loadSignatureImage(details, id) {
+  if (!details.open || details.dataset.loading === "true" || details.dataset.loaded === "true") return;
+  const box = details.querySelector(".signature-image");
+  details.dataset.loading = "true";
+  box.textContent = "簽名載入中…";
+  const record = transactions.find(t => t.id === id);
+  const key = id + "|" + (record?.signed_at || "");
+  try {
+    let image = signatureImageCache.get(key);
+    if (!image) {
+      const {data,error} = await client.from("transactions").select("signature,signed_at").eq("id",id).single();
+      if (error) throw error;
+      if (!data?.signature) throw new Error("尚未收到簽名，請重新整理紀錄");
+      if (!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(data.signature)) throw new Error("簽名格式無法顯示，請聯絡店主");
+      image = data.signature;
+      if (data.signed_at === record?.signed_at) {
+        if (signatureImageCache.size >= 12) signatureImageCache.delete(signatureImageCache.keys().next().value);
+        signatureImageCache.set(key,image);
+      }
+    }
+    const img = document.createElement("img");
+    img.alt = "顧客簽名";
+    img.style.cssText = "display:block;max-width:280px;width:100%;margin-top:10px;border:1px solid #ddd;border-radius:8px;background:white;padding:8px";
+    img.src = image;
+    box.replaceChildren(img);
+    details.dataset.loaded = "true";
+  } catch(error) {
+    box.textContent = "載入失敗：" + (error.message || "請重試") + "。關閉後再點開可重試。";
+  } finally { details.dataset.loading = "false"; }
+}
+
+function scheduleSearch() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderSearchResults, 150);
 }
 
 // Persist the new rule in the existing notes field; historical records retain their original accounting.
@@ -1226,6 +1275,8 @@ function renderSearchResults() {
 
   const keyword =
     searchBox.value.trim().toLowerCase();
+  const key = passFilter + "|" + keyword;
+  if (key !== searchKey) { searchKey = key; searchLimit = 50; }
 
   const list =
     passes.filter(pass => {
@@ -1273,7 +1324,7 @@ function renderSearchResults() {
   }
 
   box.innerHTML =
-    list.map(pass => {
+    list.slice(0,searchLimit).map(pass => {
       const status =
         getPassStatus(pass);
 
@@ -1348,7 +1399,7 @@ function renderSearchResults() {
 
         </div>
       `;
-    }).join("");
+    }).join("") + (list.length > searchLimit ? '<button class="btn secondary" onclick="searchLimit += 50; renderSearchResults()">載入更多計次券（已顯示 ' + searchLimit + ' / ' + list.length + '）</button>' : "");
 }
 
 function selectPass(id) {
@@ -1426,7 +1477,7 @@ function renderSelectedPass() {
                 ${esc(transaction.service_type || "")}・補差 $${money(transaction.extra_amount)}
                 ・
                 ${
-                  transaction.signature
+                  hasSignature(transaction)
                     ? '<span class="signed">已簽名</span>'
                     : '<span class="unsigned">未簽名</span>'
                 }
@@ -2473,9 +2524,8 @@ async function persistUsage() {
 
   const groomRedemption = redeemed && document.getElementById("serviceType").value === "大美";
   if (redeemed) {
-    const latestUsage = await client.from("transactions").select("*").eq("pass_id", passId);
-    if (latestUsage.error) return alert("無法確認剩餘次數：" + latestUsage.error.message);
-    transactions = transactions.filter(t => t.pass_id !== passId).concat(latestUsage.data || []);
+    const latestUsage = await readAllLightweight("transaction_summaries", passId);
+    transactions = transactions.filter(t => t.pass_id !== passId).concat(latestUsage);
     const available = (groomRedemption ? Math.max(0, Number(selectedPass.total_uses || 5) - 1) : totalUses(selectedPass)) - getUsedCount(passId);
     if (available < 1) {
       alert(groomRedemption ? "取消贈次後不足1次，無法折抵大美容；請選擇本次不折抵。" : "此計次券已無剩餘次數");
@@ -2575,8 +2625,8 @@ function renderRecords() {
     if (keyword && !text.includes(keyword)) return false;
     if (recordFilter === "redeemed") return transaction.redeemed !== false;
     if (recordFilter === "notRedeemed") return transaction.redeemed === false;
-    if (recordFilter === "signed") return !!transaction.signature;
-    if (recordFilter === "unsigned") return !transaction.signature;
+    if (recordFilter === "signed") return hasSignature(transaction);
+    if (recordFilter === "unsigned") return !hasSignature(transaction);
     return true;
   });
 
@@ -2587,7 +2637,7 @@ function renderRecords() {
     transaction => !transaction.voided && transaction.service_date === date
   );
 
-  const signed = dayAll.filter(transaction => !!transaction.signature).length;
+  const signed = dayAll.filter(hasSignature).length;
   const noRedeem = dayAll.filter(transaction => transaction.redeemed === false).length;
 
   summary.textContent = `${date}｜共 ${dayAll.length} 筆｜已簽 ${signed}｜未簽 ${dayAll.length - signed}｜未折抵 ${noRedeem}`;
@@ -2597,7 +2647,9 @@ function renderRecords() {
     return;
   }
 
-  box.innerHTML = list.map(transaction => {
+  const nextRecordKey = date + "|" + keyword + "|" + recordFilter;
+  if (recordKey !== nextRecordKey) { recordKey = nextRecordKey; recordLimit = 50; }
+  box.innerHTML = list.slice(0,recordLimit).map(transaction => {
     const pass = passes.find(p => p.id === transaction.pass_id);
 
     return `
@@ -2605,8 +2657,8 @@ function renderRecords() {
         <div class="record-head">
           <div><b>${esc(pass?.pet_name || "未知毛孩")}</b>・${esc(pass?.owner_name || "")}</div>
           <div>
-            ${transaction.signature
-              ? '<span class="signed">已簽名</span>　<details style="display:inline-block"><summary style="color:#06c;text-decoration:underline;cursor:pointer">查看簽名</summary><img src="' + transaction.signature + '" style="display:block;max-width:280px;width:100%;margin-top:10px;border:1px solid #ddd;border-radius:8px;background:white;padding:8px"></details>'
+            ${hasSignature(transaction)
+              ? '<span class="signed">已簽名</span>　<details style="display:inline-block" ontoggle="loadSignatureImage(this,decodeURIComponent(\'' + encodeURIComponent(transaction.id).replace(/'/g, '%27') + '\'))"><summary style="color:#06c;text-decoration:underline;cursor:pointer">查看簽名</summary><div class="signature-image muted">點開才載入簽名</div></details>'
               : '<span class="unsigned">未簽名</span>'}
           </div>
         </div>
@@ -2628,7 +2680,7 @@ function renderRecords() {
         </div>` : ""}
       </div>
     `;
-  }).join("");
+  }).join("") + (list.length > recordLimit ? '<button class="btn secondary" onclick="recordLimit += 50; renderRecords()">載入更多紀錄</button>' : "");
 }
 
 /* =========================
@@ -2825,7 +2877,7 @@ async function issueRemoteLink(id) {
   if (usageSaving) return;
   const record = transactions.find(t => t.id === id && !t.voided);
   if (!record) return alert("找不到紀錄，請重新整理。");
-  if (!confirm("產生24小時有效的" + (record.signature ? "重簽" : "補簽") + "連結？舊連結會失效，這個動作不會再扣次。")) return;
+  if (!confirm("產生24小時有效的" + (hasSignature(record) ? "重簽" : "補簽") + "連結？舊連結會失效，這個動作不會再扣次。")) return;
   usageSaving = true;
   try {
     const result = await remoteRequest({action:"issue",transaction_id:id},true);
@@ -2904,9 +2956,9 @@ function showRemoteLink(result,id) {
   remoteLinkTimer=setInterval(async()=>{
     if(checking || document.hidden)return;checking=true;
     try{
-      const {data,error}=await client.from("transactions").select("signature,signed_at,voided").eq("id",id).single();
+      const {data,error}=await client.from("transaction_summaries").select("has_signature,signed_at,voided").eq("id",id).single();
       if(error)return;
-      if(data.voided || (data.signature && data.signed_at!==initial)){
+      if(data.voided || (hasSignature(data) && data.signed_at!==initial)){
         document.getElementById("remoteLinkStatus").textContent=data.voided?"此筆已作廢，連結無法再簽名":"已收到客人簽名 ✓";
         clearInterval(remoteLinkTimer);await refreshData();
       }
@@ -2999,5 +3051,6 @@ window.addEventListener(
 
 </body>
 </html>
+
 
 
