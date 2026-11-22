@@ -2549,7 +2549,7 @@ async function persistUsage() {
   const canvas = document.getElementById("signatureCanvas");
   const row = {
     pass_id: passId,
-    sequence_no: redeemed ? Math.max(0, ...transactions.filter(t => t.pass_id === passId).map(t => Number(t.sequence_no) || 0)) + 1 : 0,
+    sequence_no: redeemed ? (Array.from({ length: groomRedemption ? Math.max(0, Number(selectedPass.total_uses || 5) - 1) : totalUses(selectedPass) }, (_, i) => i + 1).find(sequence => !usedTransactions(passId).some(transaction => Number(transaction.sequence_no) === sequence)) ?? 0) : 0,
     service_date: document.getElementById("serviceDate").value || today(),
     service_type: document.getElementById("serviceType").value,
     original_price: num("originalPrice"),
